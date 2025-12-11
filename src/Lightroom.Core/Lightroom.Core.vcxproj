@@ -144,9 +144,19 @@
     <ClInclude Include="d3d11rhi\RHIVertexBuffer.h" />
     <ClInclude Include="d3d11rhi\RHIViewPort.h" />
     <ClInclude Include="d3d11rhi\ShaderCore.h" />
+    <ClInclude Include="D3D9Interop.h" />
+    <ClInclude Include="ImageProcessor.h" />
+    <ClInclude Include="RenderTargetManager.h" />
+    <ClInclude Include="RenderGraph.h" />
+    <ClInclude Include="RenderNode.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="LightroomSDK.cpp" />
+    <ClCompile Include="D3D9Interop.cpp" />
+    <ClCompile Include="ImageProcessor.cpp" />
+    <ClCompile Include="RenderTargetManager.cpp" />
+    <ClCompile Include="RenderGraph.cpp" />
+    <ClCompile Include="RenderNode.cpp" />
     <ClCompile Include="d3d11rhi\D3D11CommandContext.cpp" />
     <ClCompile Include="d3d11rhi\D3D11IndexBuffer.cpp" />
     <ClCompile Include="d3d11rhi\D3D11RenderTarget.cpp" />

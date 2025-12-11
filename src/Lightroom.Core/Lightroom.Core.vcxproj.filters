@@ -68,9 +68,19 @@
     <ClCompile Include="d3d11rhi\RHIViewPort.cpp">
       <Filter>d3d11rhi</Filter>
     </ClCompile>
+    <ClCompile Include="D3D9Interop.cpp" />
+    <ClCompile Include="ImageProcessor.cpp" />
+    <ClCompile Include="RenderTargetManager.cpp" />
+    <ClCompile Include="RenderGraph.cpp" />
+    <ClCompile Include="RenderNode.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="LightroomSDK.h" />
+    <ClInclude Include="D3D9Interop.h" />
+    <ClInclude Include="ImageProcessor.h" />
+    <ClInclude Include="RenderTargetManager.h" />
+    <ClInclude Include="RenderGraph.h" />
+    <ClInclude Include="RenderNode.h" />
     <ClInclude Include="d3d11rhi\Common.h">
       <Filter>d3d11rhi</Filter>
     </ClInclude>
