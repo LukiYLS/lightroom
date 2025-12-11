@@ -1,0 +1,203 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="LightroomSDK.cpp" />
+    <ClCompile Include="d3d11rhi\D3D11CommandContext.cpp">
+      <Filter>d3d11rhi</Filter>
+    </ClCompile>
+    <ClCompile Include="d3d11rhi\D3D11IndexBuffer.cpp">
+      <Filter>d3d11rhi</Filter>
+    </ClCompile>
+    <ClCompile Include="d3d11rhi\D3D11RenderTarget.cpp">
+      <Filter>d3d11rhi</Filter>
+    </ClCompile>
+    <ClCompile Include="d3d11rhi\D3D11RHI.cpp">
+      <Filter>d3d11rhi</Filter>
+    </ClCompile>
+    <ClCompile Include="d3d11rhi\D3D11Shader.cpp">
+      <Filter>d3d11rhi</Filter>
+    </ClCompile>
+    <ClCompile Include="d3d11rhi\D3D11State.cpp">
+      <Filter>d3d11rhi</Filter>
+    </ClCompile>
+    <ClCompile Include="d3d11rhi\D3D11StateCachePrivate.cpp">
+      <Filter>d3d11rhi</Filter>
+    </ClCompile>
+    <ClCompile Include="d3d11rhi\D3D11Texture1D.cpp">
+      <Filter>d3d11rhi</Filter>
+    </ClCompile>
+    <ClCompile Include="d3d11rhi\D3D11Texture2D.cpp">
+      <Filter>d3d11rhi</Filter>
+    </ClCompile>
+    <ClCompile Include="d3d11rhi\D3D11TextureCube.cpp">
+      <Filter>d3d11rhi</Filter>
+    </ClCompile>
+    <ClCompile Include="d3d11rhi\D3D11TilePool.cpp">
+      <Filter>d3d11rhi</Filter>
+    </ClCompile>
+    <ClCompile Include="d3d11rhi\D3D11UniformBuffer.cpp">
+      <Filter>d3d11rhi</Filter>
+    </ClCompile>
+    <ClCompile Include="d3d11rhi\D3D11UnorderedAccessView.cpp">
+      <Filter>d3d11rhi</Filter>
+    </ClCompile>
+    <ClCompile Include="d3d11rhi\D3D11VertexBuffer.cpp">
+      <Filter>d3d11rhi</Filter>
+    </ClCompile>
+    <ClCompile Include="d3d11rhi\D3D11ViewPort.cpp">
+      <Filter>d3d11rhi</Filter>
+    </ClCompile>
+    <ClCompile Include="d3d11rhi\D3D11WindowDevice.cpp">
+      <Filter>d3d11rhi</Filter>
+    </ClCompile>
+    <ClCompile Include="d3d11rhi\D3DShaderUtil.cpp">
+      <Filter>d3d11rhi</Filter>
+    </ClCompile>
+    <ClCompile Include="d3d11rhi\DynamicRHI.cpp">
+      <Filter>d3d11rhi</Filter>
+    </ClCompile>
+    <ClCompile Include="d3d11rhi\RHI.cpp">
+      <Filter>d3d11rhi</Filter>
+    </ClCompile>
+    <ClCompile Include="d3d11rhi\RHICachedStates.cpp">
+      <Filter>d3d11rhi</Filter>
+    </ClCompile>
+    <ClCompile Include="d3d11rhi\RHIShdader.cpp">
+      <Filter>d3d11rhi</Filter>
+    </ClCompile>
+    <ClCompile Include="d3d11rhi\RHIViewPort.cpp">
+      <Filter>d3d11rhi</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="LightroomSDK.h" />
+    <ClInclude Include="d3d11rhi\Common.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\D3D11CommandContext.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\D3D11IndexBuffer.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\D3D11RenderTarget.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\D3D11ReourceTraits.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\D3D11RHI.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\D3D11RHIDeclare.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\D3D11RHIPrivate.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\D3D11Shader.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\D3D11State.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\D3D11StateCachePrivate.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\D3D11Texture1D.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\D3D11Texture2D.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\D3D11TextureCube.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\D3D11TilePool.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\D3D11UniformBuffer.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\D3D11UnorderedAccessView.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\D3D11VertexBuffer.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\D3D11ViewPort.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\D3DShaderUtil.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\DynamicRHI.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\RHI.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\RHICachedStates.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\RHICommandContext.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\RHIDefinitions.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\RHIIndexBuffer.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\RHIPipeLineState.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\RHIRenderTarget.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\RHIShaderDefine.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\RHIShdader.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\RHIState.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\RHIStaticState.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\RHITexture1D.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\RHITexture2D.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\RHITextureCube.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\RHITilePool.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\RHIUniformBuffer.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\RHIUnorderedAccessView.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\RHIVertexBuffer.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\RHIViewPort.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d11rhi\ShaderCore.h">
+      <Filter>d3d11rhi</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="d3d11rhi">
+      <UniqueIdentifier>{60c26f0a-2e4c-4313-a3f7-d0b443cee228}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

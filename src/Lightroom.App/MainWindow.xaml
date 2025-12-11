@@ -1,0 +1,126 @@
+﻿<Window x:Class="Lightroom.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:Lightroom.App.Controls"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Lightroom Clone" Height="900" Width="1600"
+        Background="#1E1E1E" Foreground="#DDDDDD"
+        WindowStartupLocation="CenterScreen"
+        Loaded="Window_Loaded" Closing="Window_Closing">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>      <!-- Top Menu Bar -->
+            <RowDefinition Height="*"/>         <!-- Main Content Area -->
+            <RowDefinition Height="Auto"/>      <!-- Filmstrip -->
+        </Grid.RowDefinitions>
+        
+        <!-- Top Menu Bar -->
+        <controls:TopMenuBar x:Name="TopMenuBarControl" 
+                            Grid.Row="0"
+                            ImportPhotosRequested="TopMenuBar_ImportPhotosRequested"
+                            ExportRequested="TopMenuBar_ExportRequested"
+                            LibraryModeRequested="TopMenuBar_LibraryModeRequested"
+                            DevelopModeRequested="TopMenuBar_DevelopModeRequested"/>
+        
+        <!-- Main Content Area -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="280" MinWidth="200" MaxWidth="400">
+                    <ColumnDefinition.Style>
+                        <Style TargetType="ColumnDefinition">
+                            <Setter Property="Width" Value="280"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ElementName=LeftPanelToggle, Path=IsChecked}" Value="False">
+                                    <Setter Property="Width" Value="0"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ColumnDefinition.Style>
+                </ColumnDefinition>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="350" MinWidth="250" MaxWidth="500">
+                    <ColumnDefinition.Style>
+                        <Style TargetType="ColumnDefinition">
+                            <Setter Property="Width" Value="350"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ElementName=RightPanelToggle, Path=IsChecked}" Value="False">
+                                    <Setter Property="Width" Value="0"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ColumnDefinition.Style>
+                </ColumnDefinition>
+            </Grid.ColumnDefinitions>
+            
+            <!-- Left Panel -->
+            <controls:LeftPanel x:Name="LeftPanelControl" 
+                               Grid.Column="0"
+                               FolderSelected="LeftPanel_FolderSelected"
+                               CollectionSelected="LeftPanel_CollectionSelected"/>
+            
+            <!-- Left Panel Toggle Button -->
+            <ToggleButton x:Name="LeftPanelToggle" 
+                         Grid.Column="1"
+                         Width="8" 
+                         IsChecked="True"
+                         Background="#3F3F46" 
+                         BorderThickness="0"
+                         Cursor="SizeWE"
+                         Checked="PanelToggle_Checked"
+                         Unchecked="PanelToggle_Unchecked">
+                <ToggleButton.Template>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border Background="{TemplateBinding Background}">
+                            <Path Data="M 0,0 L 4,4 L 0,8 Z" 
+                                 Fill="#999999" 
+                                 HorizontalAlignment="Center" 
+                                 VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </ToggleButton.Template>
+            </ToggleButton>
+            
+            <!-- Center: Image Editor View -->
+            <controls:ImageEditorView x:Name="ImageEditorViewControl" 
+                                     Grid.Column="2"
+                                     ZoomChanged="ImageEditorView_ZoomChanged"/>
+            
+            <!-- Right Panel Toggle Button -->
+            <ToggleButton x:Name="RightPanelToggle" 
+                         Grid.Column="3"
+                         Width="8" 
+                         IsChecked="True"
+                         Background="#3F3F46" 
+                         BorderThickness="0"
+                         Cursor="SizeWE"
+                         Checked="PanelToggle_Checked"
+                         Unchecked="PanelToggle_Unchecked">
+                <ToggleButton.Template>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border Background="{TemplateBinding Background}">
+                            <Path x:Name="ArrowPath" 
+                                 Data="M 4,0 L 0,4 L 4,8 Z" 
+                                 Fill="#999999" 
+                                 HorizontalAlignment="Center" 
+                                 VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </ToggleButton.Template>
+            </ToggleButton>
+            
+            <!-- Right Panel -->
+            <controls:RightPanel x:Name="RightPanelControl" 
+                               Grid.Column="4"
+                               AdjustmentChanged="RightPanel_AdjustmentChanged"/>
+        </Grid>
+        
+        <!-- Bottom Filmstrip -->
+        <controls:FilmstripView x:Name="FilmstripViewControl" 
+                               Grid.Row="2"
+                               ThumbnailSelected="FilmstripView_ThumbnailSelected"/>
+    </Grid>
+</Window>

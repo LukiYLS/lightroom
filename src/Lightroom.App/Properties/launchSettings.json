@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "Lightroom.App": {
+      "commandName": "Project",
+      "nativeDebugging": true,
+      "hotReloadEnabled": true
+    }
+  }
+}

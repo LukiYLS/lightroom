@@ -1,0 +1,163 @@
+<UserControl x:Class="Lightroom.App.Controls.RightPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             mc:Ignorable="d" 
+             d:DesignHeight="800" d:DesignWidth="350"
+             Background="#252526">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        
+        <!-- Panel Header -->
+        <Border Grid.Row="0" Background="#1E1E1E" Padding="10,8">
+            <TextBlock Text="修改照片" Foreground="White" FontWeight="SemiBold"/>
+        </Border>
+        
+        <!-- Scrollable Content -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="15">
+                
+                <!-- Basic Adjustments -->
+                <Expander Header="基本" IsExpanded="True" 
+                         Foreground="White" 
+                         Margin="0,0,0,10">
+                    <StackPanel Margin="0,10,0,0">
+                        <!-- Exposure -->
+                        <StackPanel Margin="0,0,0,15">
+                            <Grid>
+                                <TextBlock Text="曝光度" Foreground="#CCCCCC" FontSize="12"/>
+                                <TextBlock x:Name="ExposureValue" 
+                                          Text="0.00" 
+                                          Foreground="#999999" 
+                                          FontSize="11"
+                                          HorizontalAlignment="Right"/>
+                            </Grid>
+                            <Slider x:Name="ExposureSlider" 
+                                   Minimum="-5" Maximum="5" Value="0" 
+                                   TickFrequency="0.1"
+                                   ValueChanged="Slider_ValueChanged"/>
+                        </StackPanel>
+                        
+                        <!-- Contrast -->
+                        <StackPanel Margin="0,0,0,15">
+                            <Grid>
+                                <TextBlock Text="对比度" Foreground="#CCCCCC" FontSize="12"/>
+                                <TextBlock x:Name="ContrastValue" 
+                                          Text="0" 
+                                          Foreground="#999999" 
+                                          FontSize="11"
+                                          HorizontalAlignment="Right"/>
+                            </Grid>
+                            <Slider x:Name="ContrastSlider" 
+                                   Minimum="-100" Maximum="100" Value="0" 
+                                   ValueChanged="Slider_ValueChanged"/>
+                        </StackPanel>
+                        
+                        <!-- Highlights -->
+                        <StackPanel Margin="0,0,0,15">
+                            <Grid>
+                                <TextBlock Text="高光" Foreground="#CCCCCC" FontSize="12"/>
+                                <TextBlock x:Name="HighlightsValue" 
+                                          Text="0" 
+                                          Foreground="#999999" 
+                                          FontSize="11"
+                                          HorizontalAlignment="Right"/>
+                            </Grid>
+                            <Slider x:Name="HighlightsSlider" 
+                                   Minimum="-100" Maximum="100" Value="0" 
+                                   ValueChanged="Slider_ValueChanged"/>
+                        </StackPanel>
+                        
+                        <!-- Shadows -->
+                        <StackPanel Margin="0,0,0,15">
+                            <Grid>
+                                <TextBlock Text="阴影" Foreground="#CCCCCC" FontSize="12"/>
+                                <TextBlock x:Name="ShadowsValue" 
+                                          Text="0" 
+                                          Foreground="#999999" 
+                                          FontSize="11"
+                                          HorizontalAlignment="Right"/>
+                            </Grid>
+                            <Slider x:Name="ShadowsSlider" 
+                                   Minimum="-100" Maximum="100" Value="0" 
+                                   ValueChanged="Slider_ValueChanged"/>
+                        </StackPanel>
+                        
+                        <!-- Whites -->
+                        <StackPanel Margin="0,0,0,15">
+                            <Grid>
+                                <TextBlock Text="白色色阶" Foreground="#CCCCCC" FontSize="12"/>
+                                <TextBlock x:Name="WhitesValue" 
+                                          Text="0" 
+                                          Foreground="#999999" 
+                                          FontSize="11"
+                                          HorizontalAlignment="Right"/>
+                            </Grid>
+                            <Slider x:Name="WhitesSlider" 
+                                   Minimum="-100" Maximum="100" Value="0" 
+                                   ValueChanged="Slider_ValueChanged"/>
+                        </StackPanel>
+                        
+                        <!-- Blacks -->
+                        <StackPanel Margin="0,0,0,15">
+                            <Grid>
+                                <TextBlock Text="黑色色阶" Foreground="#CCCCCC" FontSize="12"/>
+                                <TextBlock x:Name="BlacksValue" 
+                                          Text="0" 
+                                          Foreground="#999999" 
+                                          FontSize="11"
+                                          HorizontalAlignment="Right"/>
+                            </Grid>
+                            <Slider x:Name="BlacksSlider" 
+                                   Minimum="-100" Maximum="100" Value="0" 
+                                   ValueChanged="Slider_ValueChanged"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Expander>
+                
+                <!-- Tone Curve -->
+                <Expander Header="色调曲线" IsExpanded="False" 
+                         Foreground="White" 
+                         Margin="0,0,0,10">
+                    <StackPanel Margin="0,10,0,0">
+                        <TextBlock Text="色调曲线功能待实现" 
+                                  Foreground="#999999" 
+                                  FontSize="11" 
+                                  Margin="0,20"/>
+                    </StackPanel>
+                </Expander>
+                
+                <!-- HSL/Color -->
+                <Expander Header="HSL / 颜色" IsExpanded="False" 
+                         Foreground="White" 
+                         Margin="0,0,0,10">
+                    <StackPanel Margin="0,10,0,0">
+                        <TextBlock Text="HSL 调整功能待实现" 
+                                  Foreground="#999999" 
+                                  FontSize="11" 
+                                  Margin="0,20"/>
+                    </StackPanel>
+                </Expander>
+                
+                <!-- Detail -->
+                <Expander Header="细节" IsExpanded="False" 
+                         Foreground="White" 
+                         Margin="0,0,0,10">
+                    <StackPanel Margin="0,10,0,0">
+                        <TextBlock Text="锐化和降噪功能待实现" 
+                                  Foreground="#999999" 
+                                  FontSize="11" 
+                                  Margin="0,20"/>
+                    </StackPanel>
+                </Expander>
+                
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>
+
+

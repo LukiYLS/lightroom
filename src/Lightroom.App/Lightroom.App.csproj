@@ -1,0 +1,51 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+
+  <!-- 
+    Ensure the C++ DLL and PDB are copied to the output directory.
+    Assumes the C++ project builds to $(SolutionDir)bin\$(Configuration)\
+  -->
+  <Target Name="CopyNativeDll" AfterTargets="Build">
+    <PropertyGroup>
+      <NativeDllPath>..\..\bin\$(Configuration)\LightroomCore.dll</NativeDllPath>
+      <NativePdbPath>..\..\bin\$(Configuration)\LightroomCore.pdb</NativePdbPath>
+    </PropertyGroup>
+    <Message Text="Copying native DLL from $(NativeDllPath) to $(OutDir)" Importance="high" />
+    <Copy SourceFiles="$(NativeDllPath)" DestinationFolder="$(OutDir)" Condition="Exists('$(NativeDllPath)')" ContinueOnError="true" />
+    <Copy SourceFiles="$(NativePdbPath)" DestinationFolder="$(OutDir)" Condition="Exists('$(NativePdbPath)')" ContinueOnError="true" />
+  </Target>
+  <ItemGroup>
+    <Compile Update="Properties\Resources.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+    <Compile Update="Properties\Settings.Designer.cs">
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Update="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="Properties\Settings.settings">
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+
+</Project>

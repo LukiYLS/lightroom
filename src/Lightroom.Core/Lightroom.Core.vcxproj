@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{46F19A12-B675-4F8A-8519-9B2D38178123}</ProjectGuid>
+    <RootNamespace>LightroomCore</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+    <OutDir>$(SolutionDir)bin\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)obj\$(ProjectName)\$(Configuration)\</IntDir>
+    <TargetName>LightroomCore</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <OutDir>$(SolutionDir)bin\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)obj\$(ProjectName)\$(Configuration)\</IntDir>
+    <TargetName>LightroomCore</TargetName>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;LIGHTROOM_CORE_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>$(ProjectDir)d3d11rhi;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <Optimization>Disabled</Optimization>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <EnableUAC>false</EnableUAC>
+      <ModuleDefinitionFile>$(ProjectDir)LightroomCore.def</ModuleDefinitionFile>
+      <AdditionalDependencies>d3d11.lib;dxgi.lib;d3dcompiler.lib;dxguid.lib;d3d9.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;LIGHTROOM_CORE_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>$(ProjectDir)d3d11rhi;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableUAC>false</EnableUAC>
+      <AdditionalDependencies>d3d11.lib;dxgi.lib;d3dcompiler.lib;dxguid.lib;d3d9.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="LightroomSDK.h" />
+    <ClInclude Include="d3d11rhi\Common.h" />
+    <ClInclude Include="d3d11rhi\D3D11CommandContext.h" />
+    <ClInclude Include="d3d11rhi\D3D11IndexBuffer.h" />
+    <ClInclude Include="d3d11rhi\D3D11RenderTarget.h" />
+    <ClInclude Include="d3d11rhi\D3D11ReourceTraits.h" />
+    <ClInclude Include="d3d11rhi\D3D11RHI.h" />
+    <ClInclude Include="d3d11rhi\D3D11RHIDeclare.h" />
+    <ClInclude Include="d3d11rhi\D3D11RHIPrivate.h" />
+    <ClInclude Include="d3d11rhi\D3D11Shader.h" />
+    <ClInclude Include="d3d11rhi\D3D11State.h" />
+    <ClInclude Include="d3d11rhi\D3D11StateCachePrivate.h" />
+    <ClInclude Include="d3d11rhi\D3D11Texture1D.h" />
+    <ClInclude Include="d3d11rhi\D3D11Texture2D.h" />
+    <ClInclude Include="d3d11rhi\D3D11TextureCube.h" />
+    <ClInclude Include="d3d11rhi\D3D11TilePool.h" />
+    <ClInclude Include="d3d11rhi\D3D11UniformBuffer.h" />
+    <ClInclude Include="d3d11rhi\D3D11UnorderedAccessView.h" />
+    <ClInclude Include="d3d11rhi\D3D11VertexBuffer.h" />
+    <ClInclude Include="d3d11rhi\D3D11ViewPort.h" />
+    <ClInclude Include="d3d11rhi\D3DShaderUtil.h" />
+    <ClInclude Include="d3d11rhi\DynamicRHI.h" />
+    <ClInclude Include="d3d11rhi\RHI.h" />
+    <ClInclude Include="d3d11rhi\RHICachedStates.h" />
+    <ClInclude Include="d3d11rhi\RHICommandContext.h" />
+    <ClInclude Include="d3d11rhi\RHIDefinitions.h" />
+    <ClInclude Include="d3d11rhi\RHIIndexBuffer.h" />
+    <ClInclude Include="d3d11rhi\RHIPipeLineState.h" />
+    <ClInclude Include="d3d11rhi\RHIRenderTarget.h" />
+    <ClInclude Include="d3d11rhi\RHIShaderDefine.h" />
+    <ClInclude Include="d3d11rhi\RHIShdader.h" />
+    <ClInclude Include="d3d11rhi\RHIState.h" />
+    <ClInclude Include="d3d11rhi\RHIStaticState.h" />
+    <ClInclude Include="d3d11rhi\RHITexture1D.h" />
+    <ClInclude Include="d3d11rhi\RHITexture2D.h" />
+    <ClInclude Include="d3d11rhi\RHITextureCube.h" />
+    <ClInclude Include="d3d11rhi\RHITilePool.h" />
+    <ClInclude Include="d3d11rhi\RHIUniformBuffer.h" />
+    <ClInclude Include="d3d11rhi\RHIUnorderedAccessView.h" />
+    <ClInclude Include="d3d11rhi\RHIVertexBuffer.h" />
+    <ClInclude Include="d3d11rhi\RHIViewPort.h" />
+    <ClInclude Include="d3d11rhi\ShaderCore.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="LightroomSDK.cpp" />
+    <ClCompile Include="d3d11rhi\D3D11CommandContext.cpp" />
+    <ClCompile Include="d3d11rhi\D3D11IndexBuffer.cpp" />
+    <ClCompile Include="d3d11rhi\D3D11RenderTarget.cpp" />
+    <ClCompile Include="d3d11rhi\D3D11RHI.cpp" />
+    <ClCompile Include="d3d11rhi\D3D11Shader.cpp" />
+    <ClCompile Include="d3d11rhi\D3D11State.cpp" />
+    <ClCompile Include="d3d11rhi\D3D11StateCachePrivate.cpp" />
+    <ClCompile Include="d3d11rhi\D3D11Texture1D.cpp" />
+    <ClCompile Include="d3d11rhi\D3D11Texture2D.cpp" />
+    <ClCompile Include="d3d11rhi\D3D11TextureCube.cpp" />
+    <ClCompile Include="d3d11rhi\D3D11TilePool.cpp" />
+    <ClCompile Include="d3d11rhi\D3D11UniformBuffer.cpp" />
+    <ClCompile Include="d3d11rhi\D3D11UnorderedAccessView.cpp" />
+    <ClCompile Include="d3d11rhi\D3D11VertexBuffer.cpp" />
+    <ClCompile Include="d3d11rhi\D3D11ViewPort.cpp" />
+    <ClCompile Include="d3d11rhi\D3D11WindowDevice.cpp" />
+    <ClCompile Include="d3d11rhi\D3DShaderUtil.cpp" />
+    <ClCompile Include="d3d11rhi\DynamicRHI.cpp" />
+    <ClCompile Include="d3d11rhi\RHI.cpp" />
+    <ClCompile Include="d3d11rhi\RHICachedStates.cpp" />
+    <ClCompile Include="d3d11rhi\RHIShdader.cpp" />
+    <ClCompile Include="d3d11rhi\RHIViewPort.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="LightroomCore.def" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

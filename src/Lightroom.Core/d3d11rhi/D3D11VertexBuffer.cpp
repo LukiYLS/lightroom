@@ -1,0 +1,97 @@
+#include "D3D11VertexBuffer.h"
+#include "RHIDefinitions.h"
+#include "D3D11RHI.h"
+
+namespace RenderCore
+{
+	D3D11VertexBuffer::D3D11VertexBuffer(D3D11DynamicRHI* InD3D11RHI)
+		: D3D11RHI(InD3D11RHI)
+	{
+	}
+
+	D3D11VertexBuffer::~D3D11VertexBuffer()
+	{
+	}
+
+	bool D3D11VertexBuffer::CreateVertexBuffer(const void* InData, EBufferUsageFlags InUsage, int32_t StrideByteWidth, int32_t Count)
+	{
+		if (!D3D11RHI)
+			return false;
+		Stride = StrideByteWidth;
+		this->Count = Count;
+
+		D3D11_BUFFER_DESC Desc;
+		ZeroMemory(&Desc, sizeof(D3D11_BUFFER_DESC));
+		Desc.ByteWidth = StrideByteWidth * Count;
+		Desc.Usage = (InUsage & BUF_AnyDynamic) ? D3D11_USAGE_DYNAMIC : D3D11_USAGE_DEFAULT;
+		Desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+		Desc.CPUAccessFlags = (InUsage & BUF_AnyDynamic) ? D3D11_CPU_ACCESS_WRITE : 0;
+		//Desc.MiscFlags = 0;
+		//Desc.StructureByteStride = 0;
+
+		if (InUsage & BUF_UnorderedAccess)
+		{
+			Desc.BindFlags |= D3D11_BIND_UNORDERED_ACCESS;
+		}
+
+		if (InUsage & BUF_ByteAddressBuffer)
+		{
+			Desc.MiscFlags |= D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS;
+		}
+
+		if (InUsage & BUF_StreamOutput)
+		{
+			Desc.BindFlags |= D3D11_BIND_STREAM_OUTPUT;
+		}
+
+		if (InUsage & BUF_DrawIndirect)
+		{
+			Desc.MiscFlags |= D3D11_RESOURCE_MISC_DRAWINDIRECT_ARGS;
+		}
+
+		if (InUsage & BUF_ShaderResource)
+		{
+			Desc.BindFlags |= D3D11_BIND_SHADER_RESOURCE;
+		}
+
+		if (InUsage & BUF_Shared)
+		{
+			Desc.MiscFlags |= D3D11_RESOURCE_MISC_SHARED;
+		}
+
+		D3D11_SUBRESOURCE_DATA vertexInitData{};
+		//memset(&vertexInitData, 0, sizeof(D3D11_SUBRESOURCE_DATA));
+		vertexInitData.pSysMem = InData;
+		HRESULT hr = D3D11RHI->GetDevice()->CreateBuffer(&Desc, InData ? &vertexInitData : nullptr, Buffer.GetAddressOf());
+		return SUCCEEDED(hr);
+	}
+
+	void D3D11VertexBuffer::UpdateVertexBUffer(const void* InData, int32_t nVertex, int32_t sizePerVertex)
+	{
+		D3D11_MAPPED_SUBRESOURCE mapSubResource;
+		HRESULT hr = D3D11RHI->GetDeviceContext()->Map(Buffer.Get(), 0, D3D11_MAP_WRITE_NO_OVERWRITE, 0, &mapSubResource);
+		if (FAILED(hr))
+		{
+			return;
+		}
+		// Keeping logic same as original, assuming sizePerVertex offset is intended or I don't change logic
+		memcpy((uint8_t*)mapSubResource.pData + sizePerVertex, InData, nVertex * sizePerVertex);
+		D3D11RHI->GetDeviceContext()->Unmap(Buffer.Get(), 0);
+	}
+
+	int32_t D3D11VertexBuffer::GetStride() const
+	{
+		return Stride;
+	}
+
+	int32_t D3D11VertexBuffer::GetCount() const
+	{
+		return Count;
+	}
+
+	ID3D11Buffer* D3D11VertexBuffer::GetNativeBuffer() const
+	{
+		return Buffer.Get();
+	}
+
+}
