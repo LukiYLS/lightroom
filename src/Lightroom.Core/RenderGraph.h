@@ -30,6 +30,14 @@ public:
     // 获取节点数量
     size_t GetNodeCount() const { return m_Nodes.size(); }
 
+    // 获取指定索引的节点
+    std::shared_ptr<RenderNode> GetNode(size_t index) const {
+        if (index < m_Nodes.size()) {
+            return m_Nodes[index];
+        }
+        return nullptr;
+    }
+
 private:
     std::shared_ptr<RenderCore::DynamicRHI> m_RHI;
     std::vector<std::shared_ptr<RenderNode>> m_Nodes;

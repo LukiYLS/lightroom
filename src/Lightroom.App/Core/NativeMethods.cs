@@ -37,6 +37,9 @@ namespace Lightroom.App.Core
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         public static extern void ResizeRenderTarget(IntPtr renderTargetHandle, uint width, uint height);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern void SetRenderTargetZoom(IntPtr renderTargetHandle, double zoomLevel, double panX, double panY);
     }
 }
 

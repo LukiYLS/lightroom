@@ -128,8 +128,7 @@ void* CreateRenderTarget(uint32_t width, uint32_t height) {
     // 创建关联的渲染图
     auto renderGraph = std::make_unique<RenderGraph>(g_DynamicRHI);
     
-    // 默认添加一个直通节点（如果图片尺寸匹配）或缩放节点（如果尺寸不匹配）
-    // 这里先添加缩放节点，实际使用时可以根据图片尺寸动态调整
+    // 默认添加缩放节点（支持缩放和平移功能）
     auto scaleNode = std::make_shared<ScaleNode>(g_DynamicRHI);
     renderGraph->AddNode(scaleNode);
     
@@ -195,15 +194,10 @@ bool LoadImageToTarget(void* renderTargetHandle, const char* imagePath) {
             // 清除旧的渲染图
             data->RenderGraph->Clear();
             
-            if (imageWidth == renderTargetInfo->Width && imageHeight == renderTargetInfo->Height) {
-                // 尺寸匹配，使用直通节点
-                auto passthroughNode = std::make_shared<PassthroughNode>(g_DynamicRHI);
-                data->RenderGraph->AddNode(passthroughNode);
-            } else {
-                // 尺寸不匹配，使用缩放节点
-                auto scaleNode = std::make_shared<ScaleNode>(g_DynamicRHI);
-                data->RenderGraph->AddNode(scaleNode);
-            }
+            // 总是使用缩放节点以支持缩放和平移功能
+            auto scaleNode = std::make_shared<ScaleNode>(g_DynamicRHI);
+            scaleNode->SetInputImageSize(imageWidth, imageHeight);
+            data->RenderGraph->AddNode(scaleNode);
         }
         
         return true;
@@ -320,6 +314,42 @@ void ResizeRenderTarget(void* renderTargetHandle, uint32_t width, uint32_t heigh
     // 调整渲染目标大小
     if (!g_RenderTargetManager->ResizeRenderTarget(renderTargetHandle, width, height)) {
         std::cerr << "[SDK] Failed to resize render target" << std::endl;
+    }
+}
+
+void SetRenderTargetZoom(void* renderTargetHandle, double zoomLevel, double panX, double panY) {
+    if (!renderTargetHandle) {
+        return;
+    }
+    
+    auto it = g_RenderTargetData.find(renderTargetHandle);
+    if (it == g_RenderTargetData.end()) {
+        return;
+    }
+    
+    auto& data = it->second;
+    if (!data || !data->RenderGraph) {
+        return;
+    }
+    
+    // 查找 ScaleNode 并设置缩放参数
+    for (size_t i = 0; i < data->RenderGraph->GetNodeCount(); ++i) {
+        auto node = data->RenderGraph->GetNode(i);
+        if (node && strcmp(node->GetName(), "Scale") == 0) {
+            // 转换为 ScaleNode
+            auto scaleNode = std::dynamic_pointer_cast<ScaleNode>(node);
+            if (scaleNode) {
+                scaleNode->SetZoomParams(zoomLevel, panX, panY);
+                
+                // 如果已加载图片，设置输入图片尺寸
+                if (data->bHasImage && data->ImageTexture) {
+                    uint32_t imageWidth, imageHeight;
+                    g_ImageProcessor->GetLastImageSize(imageWidth, imageHeight);
+                    scaleNode->SetInputImageSize(imageWidth, imageHeight);
+                }
+            }
+            break;
+        }
     }
 }
 

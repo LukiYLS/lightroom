@@ -233,6 +233,16 @@ namespace Lightroom.App.Controls
         {
             ZoomText.Text = $"{_zoomLevel * 100:F0}%";
             ZoomChanged?.Invoke(this, _zoomLevel);
+            
+            // 调用 SDK 设置缩放参数
+            if (_renderTargetHandle != IntPtr.Zero)
+            {
+                // 计算平移偏移（当前为 0，后续可以添加平移功能）
+                double panX = 0.0;
+                double panY = 0.0;
+                
+                NativeMethods.SetRenderTargetZoom(_renderTargetHandle, _zoomLevel, panX, panY);
+            }
         }
 
         public IntPtr GetRenderTargetHandle()

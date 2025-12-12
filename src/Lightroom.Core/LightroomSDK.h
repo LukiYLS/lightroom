@@ -36,5 +36,10 @@ extern "C" {
     
     // 调整渲染目标大小
     LIGHTROOM_API void ResizeRenderTarget(void* renderTargetHandle, uint32_t width, uint32_t height);
+    
+    // 设置渲染目标的缩放参数
+    // zoomLevel: 缩放级别（1.0 = 100%, 2.0 = 200%, 0.5 = 50%）
+    // panX, panY: 平移偏移（归一化坐标，范围 -1.0 到 1.0）
+    LIGHTROOM_API void SetRenderTargetZoom(void* renderTargetHandle, double zoomLevel, double panX, double panY);
 }
 
