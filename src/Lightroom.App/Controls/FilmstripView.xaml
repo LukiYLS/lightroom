@@ -28,19 +28,55 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <Border Width="80" Height="80" 
+                        <Border Width="100" Height="100" 
                                Margin="5" 
                                Background="#252525"
-                               BorderBrush="#0078D4" 
-                               BorderThickness="2"
+                               BorderBrush="#3F3F46" 
+                               BorderThickness="1"
                                Cursor="Hand"
-                               MouseLeftButtonDown="Thumbnail_Click">
+                               MouseLeftButtonDown="Thumbnail_Click"
+                               MouseEnter="Thumbnail_MouseEnter"
+                               MouseLeave="Thumbnail_MouseLeave">
                             <Grid>
-                                <TextBlock Text="{Binding}" 
+                                <!-- Thumbnail Image -->
+                                <Image Stretch="UniformToFill"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"
+                                      Width="98" Height="98">
+                                    <Image.Source>
+                                        <Binding Path="Thumbnail"/>
+                                    </Image.Source>
+                                </Image>
+                                
+                                <!-- Loading Indicator -->
+                                <TextBlock Text="加载中..." 
                                           Foreground="#999999" 
                                           HorizontalAlignment="Center" 
                                           VerticalAlignment="Center"
-                                          FontSize="10"/>
+                                          FontSize="10">
+                                    <TextBlock.Visibility>
+                                        <Binding Path="IsLoading">
+                                            <Binding.Converter>
+                                                <BooleanToVisibilityConverter/>
+                                            </Binding.Converter>
+                                        </Binding>
+                                    </TextBlock.Visibility>
+                                </TextBlock>
+                                
+                                <!-- Error Indicator -->
+                                <TextBlock Text="错误" 
+                                          Foreground="#FF4444" 
+                                          HorizontalAlignment="Center" 
+                                          VerticalAlignment="Center"
+                                          FontSize="10">
+                                    <TextBlock.Visibility>
+                                        <Binding Path="HasError">
+                                            <Binding.Converter>
+                                                <BooleanToVisibilityConverter/>
+                                            </Binding.Converter>
+                                        </Binding>
+                                    </TextBlock.Visibility>
+                                </TextBlock>
                             </Grid>
                         </Border>
                     </DataTemplate>

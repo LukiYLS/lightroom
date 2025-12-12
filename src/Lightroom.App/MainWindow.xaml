@@ -27,7 +27,7 @@
         <!-- Main Content Area -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="280" MinWidth="200" MaxWidth="400">
+                <ColumnDefinition x:Name="LeftPanelColumn" Width="280" MinWidth="200" MaxWidth="400">
                     <ColumnDefinition.Style>
                         <Style TargetType="ColumnDefinition">
                             <Setter Property="Width" Value="280"/>
@@ -39,10 +39,10 @@
                         </Style>
                     </ColumnDefinition.Style>
                 </ColumnDefinition>
-                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition x:Name="LeftSplitterColumn" Width="8"/>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="350" MinWidth="250" MaxWidth="500">
+                <ColumnDefinition x:Name="RightSplitterColumn" Width="8"/>
+                <ColumnDefinition x:Name="RightPanelColumn" Width="350" MinWidth="250" MaxWidth="500">
                     <ColumnDefinition.Style>
                         <Style TargetType="ColumnDefinition">
                             <Setter Property="Width" Value="350"/>
@@ -59,17 +59,29 @@
             <!-- Left Panel -->
             <controls:LeftPanel x:Name="LeftPanelControl" 
                                Grid.Column="0"
-                               FolderSelected="LeftPanel_FolderSelected"
-                               CollectionSelected="LeftPanel_CollectionSelected"/>
+                               FolderSelected="LeftPanel_FolderSelected"/>
             
-            <!-- Left Panel Toggle Button -->
+            <!-- Left Panel Splitter - directly in column, no nested Grid -->
+            <GridSplitter Grid.Column="1"
+                         HorizontalAlignment="Stretch"
+                         VerticalAlignment="Stretch"
+                         Background="#3F3F46"
+                         Cursor="SizeWE"
+                         ResizeDirection="Columns"
+                         ResizeBehavior="PreviousAndNext"
+                         ShowsPreview="False"
+                         DragIncrement="1"/>
+            
+            <!-- Left Panel Toggle Button - overlay on splitter, right side -->
             <ToggleButton x:Name="LeftPanelToggle" 
                          Grid.Column="1"
+                         HorizontalAlignment="Right"
                          Width="8" 
                          IsChecked="True"
-                         Background="#3F3F46" 
+                         Background="Transparent" 
                          BorderThickness="0"
                          Cursor="SizeWE"
+                         Panel.ZIndex="10"
                          Checked="PanelToggle_Checked"
                          Unchecked="PanelToggle_Unchecked">
                 <ToggleButton.Template>
@@ -89,14 +101,27 @@
                                      Grid.Column="2"
                                      ZoomChanged="ImageEditorView_ZoomChanged"/>
             
-            <!-- Right Panel Toggle Button -->
+            <!-- Right Panel Splitter - directly in column, no nested Grid -->
+            <GridSplitter Grid.Column="3"
+                         HorizontalAlignment="Stretch"
+                         VerticalAlignment="Stretch"
+                         Background="#3F3F46"
+                         Cursor="SizeWE"
+                         ResizeDirection="Columns"
+                         ResizeBehavior="PreviousAndNext"
+                         ShowsPreview="False"
+                         DragIncrement="1"/>
+            
+            <!-- Right Panel Toggle Button - overlay on splitter, left side -->
             <ToggleButton x:Name="RightPanelToggle" 
                          Grid.Column="3"
+                         HorizontalAlignment="Left"
                          Width="8" 
                          IsChecked="True"
-                         Background="#3F3F46" 
+                         Background="Transparent" 
                          BorderThickness="0"
                          Cursor="SizeWE"
+                         Panel.ZIndex="10"
                          Checked="PanelToggle_Checked"
                          Unchecked="PanelToggle_Unchecked">
                 <ToggleButton.Template>

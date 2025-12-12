@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include "RenderNode.h"
+#include "RenderNodes/RenderNode.h"
 #include "d3d11rhi/DynamicRHI.h"
 #include <memory>
 #include <vector>

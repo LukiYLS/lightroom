@@ -3,7 +3,10 @@
 #include "ImageProcessor.h"
 #include "RenderTargetManager.h"
 #include "RenderGraph.h"
-#include "RenderNode.h"
+#include "RenderNodes/RenderNode.h"
+#include "RenderNodes/PassthroughNode.h"
+#include "RenderNodes/ScaleNode.h"
+#include "RenderNodes/BrightnessContrastNode.h"
 #include <iostream>
 #include <string>
 #include <unordered_map>

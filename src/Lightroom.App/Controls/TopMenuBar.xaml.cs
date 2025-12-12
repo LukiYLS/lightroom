@@ -3,7 +3,7 @@ using System.Windows.Controls;
 
 namespace Lightroom.App.Controls
 {
-    public partial class TopMenuBar : UserControl
+    public partial class TopMenuBar : System.Windows.Controls.UserControl
     {
         public event EventHandler? ImportPhotosRequested;
         public event EventHandler? ExportRequested;
@@ -27,12 +27,12 @@ namespace Lightroom.App.Controls
 
         private void Exit_Click(object sender, RoutedEventArgs e)
         {
-            Application.Current.Shutdown();
+            System.Windows.Application.Current.Shutdown();
         }
 
         private void Preferences_Click(object sender, RoutedEventArgs e)
         {
-            MessageBox.Show("首选项功能待实现", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+            System.Windows.MessageBox.Show("首选项功能待实现", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private void FullScreen_Click(object sender, RoutedEventArgs e)
@@ -48,12 +48,12 @@ namespace Lightroom.App.Controls
 
         private void SecondDisplay_Click(object sender, RoutedEventArgs e)
         {
-            MessageBox.Show("第二显示器功能待实现", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+            System.Windows.MessageBox.Show("第二显示器功能待实现", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private void About_Click(object sender, RoutedEventArgs e)
         {
-            MessageBox.Show("Lightroom Clone v1.0.0\n基于 WPF 和 D3D11 的图片编辑软件", 
+            System.Windows.MessageBox.Show("Lightroom Clone v1.0.0\n基于 WPF 和 D3D11 的图片编辑软件", 
                 "关于", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 

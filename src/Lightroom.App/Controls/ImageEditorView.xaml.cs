@@ -7,7 +7,7 @@ using Lightroom.App.Core;
 
 namespace Lightroom.App.Controls
 {
-    public partial class ImageEditorView : UserControl
+    public partial class ImageEditorView : System.Windows.Controls.UserControl
     {
         private IntPtr _renderTargetHandle = IntPtr.Zero;
         private IntPtr _sharedHandle = IntPtr.Zero;

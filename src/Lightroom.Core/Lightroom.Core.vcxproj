@@ -148,7 +148,10 @@
     <ClInclude Include="ImageProcessor.h" />
     <ClInclude Include="RenderTargetManager.h" />
     <ClInclude Include="RenderGraph.h" />
-    <ClInclude Include="RenderNode.h" />
+    <ClInclude Include="RenderNodes\RenderNode.h" />
+    <ClInclude Include="RenderNodes\PassthroughNode.h" />
+    <ClInclude Include="RenderNodes\ScaleNode.h" />
+    <ClInclude Include="RenderNodes\BrightnessContrastNode.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="LightroomSDK.cpp" />
@@ -156,7 +159,10 @@
     <ClCompile Include="ImageProcessor.cpp" />
     <ClCompile Include="RenderTargetManager.cpp" />
     <ClCompile Include="RenderGraph.cpp" />
-    <ClCompile Include="RenderNode.cpp" />
+    <ClCompile Include="RenderNodes\RenderNode.cpp" />
+    <ClCompile Include="RenderNodes\PassthroughNode.cpp" />
+    <ClCompile Include="RenderNodes\ScaleNode.cpp" />
+    <ClCompile Include="RenderNodes\BrightnessContrastNode.cpp" />
     <ClCompile Include="d3d11rhi\D3D11CommandContext.cpp" />
     <ClCompile Include="d3d11rhi\D3D11IndexBuffer.cpp" />
     <ClCompile Include="d3d11rhi\D3D11RenderTarget.cpp" />

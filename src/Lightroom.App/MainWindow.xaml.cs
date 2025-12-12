@@ -23,16 +23,16 @@ namespace Lightroom.App
                 bool success = NativeMethods.InitSDK();
                 if (!success)
                 {
-                    MessageBox.Show("Failed to initialize Core SDK!", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    System.Windows.MessageBox.Show("Failed to initialize Core SDK!", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
             catch (DllNotFoundException)
             {
-                MessageBox.Show("LightroomCore.dll not found. Please ensure the C++ project is built.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                System.Windows.MessageBox.Show("LightroomCore.dll not found. Please ensure the C++ project is built.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error initializing: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                System.Windows.MessageBox.Show($"Error initializing: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -88,7 +88,7 @@ namespace Lightroom.App
             if (dialog.ShowDialog() == true)
             {
                 // TODO: 实现导出功能
-                MessageBox.Show($"导出到: {dialog.FileName}", "导出", MessageBoxButton.OK, MessageBoxImage.Information);
+                System.Windows.MessageBox.Show($"导出到: {dialog.FileName}", "导出", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 
@@ -109,15 +109,33 @@ namespace Lightroom.App
         // LeftPanel Events
         private void LeftPanel_FolderSelected(object? sender, string folderPath)
         {
-            // TODO: 加载文件夹中的图片
+            if (string.IsNullOrEmpty(folderPath))
+            {
+                return;
+            }
+
             System.Diagnostics.Debug.WriteLine($"Folder selected: {folderPath}");
+            
+            // 加载文件夹中的图片到缩略图列表
+            FilmstripViewControl.LoadImagesFromFolder(folderPath);
+            
+            // 更新图片数量
+            if (FilmstripViewControl.ThumbnailPaths != null)
+            {
+                LeftPanelControl.UpdateImageCount(FilmstripViewControl.ThumbnailPaths.Count);
+                
+                // 如果有图片，加载第一张
+                if (FilmstripViewControl.ThumbnailPaths.Count > 0)
+                {
+                    ImageEditorViewControl.LoadImage(FilmstripViewControl.ThumbnailPaths[0]);
+                }
+            }
+            else
+            {
+                LeftPanelControl.UpdateImageCount(0);
+            }
         }
 
-        private void LeftPanel_CollectionSelected(object? sender, string collectionName)
-        {
-            // TODO: 加载收藏夹中的图片
-            System.Diagnostics.Debug.WriteLine($"Collection selected: {collectionName}");
-        }
 
         // RightPanel Events
         private void RightPanel_AdjustmentChanged(object? sender, (string parameter, double value) args)

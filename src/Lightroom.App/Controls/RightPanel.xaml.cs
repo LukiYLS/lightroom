@@ -4,7 +4,7 @@ using System.Windows.Controls;
 
 namespace Lightroom.App.Controls
 {
-    public partial class RightPanel : UserControl
+    public partial class RightPanel : System.Windows.Controls.UserControl
     {
         public event EventHandler<(string parameter, double value)>? AdjustmentChanged;
 
