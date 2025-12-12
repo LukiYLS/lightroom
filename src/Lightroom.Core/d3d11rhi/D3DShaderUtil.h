@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "Common.h"
 #include <D3Dcompiler.h>
 #include <d3d12shader.h>

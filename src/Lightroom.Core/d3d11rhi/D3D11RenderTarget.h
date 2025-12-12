@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "RHIRenderTarget.h"
 #include "Common.h"
 #include <map>
@@ -30,6 +30,7 @@ namespace RenderCore
 		std::map < uint32_t, std::vector< ComPtr <ID3D11RenderTargetView>>>& GetRTVS();
 
 		virtual std::shared_ptr< RHITexture2D> GetTex() const;
+		bool CreateFromExistingTexture(ID3D11Texture2D* existingTexture, EPixelFormat format);
 
 	private:
 		D3D11DynamicRHI* D3D11RHI = nullptr;

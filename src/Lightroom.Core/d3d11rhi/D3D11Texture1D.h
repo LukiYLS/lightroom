@@ -1,4 +1,4 @@
-#include "RHITexture1D.h"
+﻿#include "RHITexture1D.h"
 #include "D3D11RHIDeclare.h"
 
 namespace RenderCore

@@ -1,4 +1,4 @@
-#include "D3D11Texture1D.h"
+﻿#include "D3D11Texture1D.h"
 #include "D3D11RHIPrivate.h"
 #include "D3D11RHI.h"
 #include "Common.h"

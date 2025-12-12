@@ -159,7 +159,7 @@ void* GetRenderTargetSharedHandle(void* renderTargetHandle) {
     return g_RenderTargetManager->GetD3D9SharedHandle(renderTargetHandle);
 }
 
-LIGHTROOM_API bool LoadImageToTarget(void* renderTargetHandle, const char* imagePath) {
+bool LoadImageToTarget(void* renderTargetHandle, const char* imagePath) {
     if (!renderTargetHandle || !g_ImageProcessor || !imagePath) {
         return false;
     }
@@ -252,30 +252,18 @@ void RenderToTarget(void* renderTargetHandle) {
             }
             
             // 渲染完成后，确保命令执行完成
+            // 优化：由于 RHIRenderTarget 直接使用 D3D11SharedTexture，无需拷贝
             auto commandContext = g_DynamicRHI->GetDefaultCommandContext();
             if (commandContext) {
                 commandContext->FlushCommands();
             }
             
-            // 将 RHI 渲染目标的内容拷贝到共享纹理（用于 D3D9 互操作）
-            auto rhiTexture = renderTargetInfo->RHIRenderTarget->GetTex();
-            if (rhiTexture && renderTargetInfo->D3D11SharedTexture) {
-                RenderCore::D3D11DynamicRHI* d3d11RHI = dynamic_cast<RenderCore::D3D11DynamicRHI*>(g_DynamicRHI.get());
-                if (d3d11RHI) {
-                    RenderCore::D3D11Texture2D* d3d11Texture = dynamic_cast<RenderCore::D3D11Texture2D*>(rhiTexture.get());
-                    if (d3d11Texture) {
-                        ID3D11Texture2D* srcTexture = d3d11Texture->GetNativeTex();
-                        if (srcTexture) {
-                            ID3D11DeviceContext* d3d11Context = d3d11RHI->GetDeviceContext();
-                            if (d3d11Context) {
-                                d3d11Context->CopyResource(
-                                    renderTargetInfo->D3D11SharedTexture.Get(),
-                                    srcTexture
-                                );
-                                d3d11Context->Flush();
-                            }
-                        }
-                    }
+            // 确保 D3D11 命令已提交到 GPU
+            RenderCore::D3D11DynamicRHI* d3d11RHI = dynamic_cast<RenderCore::D3D11DynamicRHI*>(g_DynamicRHI.get());
+            if (d3d11RHI) {
+                ID3D11DeviceContext* d3d11Context = d3d11RHI->GetDeviceContext();
+                if (d3d11Context) {
+                    d3d11Context->Flush();
                 }
             }
         } else {
@@ -294,25 +282,13 @@ void RenderToTarget(void* renderTargetHandle) {
                 // 4. 确保命令执行完成
                 commandContext->FlushCommands();
                 
-                // 5. 将 RHI 渲染目标的内容拷贝到共享纹理（用于 D3D9 互操作）
-                auto rhiTexture = renderTargetInfo->RHIRenderTarget->GetTex();
-                if (rhiTexture && renderTargetInfo->D3D11SharedTexture) {
-                    RenderCore::D3D11DynamicRHI* d3d11RHI = dynamic_cast<RenderCore::D3D11DynamicRHI*>(g_DynamicRHI.get());
-                    if (d3d11RHI) {
-                        RenderCore::D3D11Texture2D* d3d11Texture = dynamic_cast<RenderCore::D3D11Texture2D*>(rhiTexture.get());
-                        if (d3d11Texture) {
-                            ID3D11Texture2D* srcTexture = d3d11Texture->GetNativeTex();
-                            if (srcTexture) {
-                                ID3D11DeviceContext* d3d11Context = d3d11RHI->GetDeviceContext();
-                                if (d3d11Context) {
-                                    d3d11Context->CopyResource(
-                                        renderTargetInfo->D3D11SharedTexture.Get(),
-                                        srcTexture
-                                    );
-                                    d3d11Context->Flush();
-                                }
-                            }
-                        }
+                // 5. 优化：由于 RHIRenderTarget 直接使用 D3D11SharedTexture，无需拷贝
+                // 只需确保 D3D11 命令已提交到 GPU
+                RenderCore::D3D11DynamicRHI* d3d11RHI = dynamic_cast<RenderCore::D3D11DynamicRHI*>(g_DynamicRHI.get());
+                if (d3d11RHI) {
+                    ID3D11DeviceContext* d3d11Context = d3d11RHI->GetDeviceContext();
+                    if (d3d11Context) {
+                        d3d11Context->Flush();
                     }
                 }
             }

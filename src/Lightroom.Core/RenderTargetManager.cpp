@@ -1,4 +1,4 @@
-#include "RenderTargetManager.h"
+﻿#include "RenderTargetManager.h"
 #include "d3d11rhi/D3D11RHI.h"
 #include "d3d11rhi/D3D11Texture2D.h"
 #include "d3d11rhi/D3D11RenderTarget.h"
@@ -90,23 +90,19 @@ void* RenderTargetManager::CreateRenderTarget(uint32_t width, uint32_t height) {
             return nullptr;
         }
 
-        // 2. 将共享纹理包装为 RHI 纹理（用于渲染图）
-        // 注意：这里需要从 D3D11 纹理创建 RHI 纹理包装
-        // 由于 RHI 接口可能不支持从现有 D3D11 纹理创建，我们需要使用共享纹理作为主要渲染目标
-        // 暂时创建一个临时的 RHI 渲染目标用于渲染，然后拷贝到共享纹理
-        info->RHIRenderTarget = m_RHI->RHICreateRenderTarget(
-            RenderCore::EPixelFormat::PF_B8G8R8A8,
-            width,
-            height,
-            1,  // NumMips
-            false,  // IsMultiSampled
-            false   // CreateDepth
-        );
-
-        if (!info->RHIRenderTarget) {
-            std::cerr << "[RenderTargetManager] Failed to create RHI render target" << std::endl;
+        // 2. 将共享纹理包装为 RHI 渲染目标（优化：直接使用共享纹理，消除冗余拷贝）
+        // 直接从共享纹理创建 RHI 渲染目标，这样渲染就直接到共享纹理上
+        RenderCore::D3D11RenderTarget* d3d11RenderTarget = new RenderCore::D3D11RenderTarget(d3d11RHI);
+        if (!d3d11RenderTarget->CreateFromExistingTexture(
+                info->D3D11SharedTexture.Get(),
+                RenderCore::EPixelFormat::PF_B8G8R8A8)) {
+            std::cerr << "[RenderTargetManager] Failed to create RHI render target from shared texture" << std::endl;
+            delete d3d11RenderTarget;
             return nullptr;
         }
+
+        // 包装为 shared_ptr
+        info->RHIRenderTarget = std::shared_ptr<RenderCore::RHIRenderTarget>(d3d11RenderTarget);
 
         // 从 RHIRenderTarget 获取纹理
         info->RHITexture = info->RHIRenderTarget->GetTex();

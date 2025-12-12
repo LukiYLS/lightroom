@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "RHITexture2D.h"
 #include "Common.h"
 #include <map>
@@ -26,13 +26,13 @@ namespace RenderCore
 		virtual core::vec2i GetSize() const;
 		virtual uint32_t GetNumMips() const;
 		virtual EPixelFormat GetPixelFormat() const override;
-
 		ID3D11Texture2D* GetNativeTex() const;
 		ID3D11RenderTargetView* GetRTV() const;
 		std::map < uint32_t, std::vector< ComPtr <ID3D11RenderTargetView>>> GetRTVS() const;
 		std::map < uint32_t, std::vector< ComPtr <ID3D11RenderTargetView>>>& GetRTVS();
 		ID3D11ShaderResourceView* GetSRV() const;
 		ID3D11DepthStencilView* GetDSV() const;
+		bool CreateFromExistingTexture(ID3D11Texture2D* existingTexture, EPixelFormat format);
 
 	private:
 		D3D11DynamicRHI* D3D11RHI;

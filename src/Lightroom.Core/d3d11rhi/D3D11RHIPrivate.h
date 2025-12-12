@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "Common.h"
 #include <d3d11.h>
 #include <d3d11_2.h>

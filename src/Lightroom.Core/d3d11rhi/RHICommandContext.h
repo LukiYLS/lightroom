@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "RHIDefinitions.h"
 #include "Common.h"
 #include "RHIPipeLineState.h"

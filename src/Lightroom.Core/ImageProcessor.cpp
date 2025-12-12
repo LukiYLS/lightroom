@@ -1,4 +1,4 @@
-#include "ImageProcessor.h"
+﻿#include "ImageProcessor.h"
 #include <wincodec.h>
 #include <comdef.h>
 #include <windows.h>

@@ -1,4 +1,4 @@
-#include "D3D11RenderTarget.h"
+﻿#include "D3D11RenderTarget.h"
 #include "D3D11RHI.h"
 #include "D3D11Texture2D.h"
 #include "D3D11CommandContext.h"
@@ -45,6 +45,27 @@ namespace RenderCore
 
 			return DepthTex->CreateTexture2D(EPixelFormat::PF_DepthStencil, Flags, SizeX, SizeY);
 		}
+		return true;
+	}
+
+	bool D3D11RenderTarget::CreateFromExistingTexture(ID3D11Texture2D* existingTexture, EPixelFormat format)
+	{
+		if (!existingTexture) {
+			return false;
+		}
+
+		// 获取纹理描述
+		D3D11_TEXTURE2D_DESC desc;
+		existingTexture->GetDesc(&desc);
+
+		Size = core::vec2i((int32_t)desc.Width, (int32_t)desc.Height);
+
+		// 从现有纹理创建 D3D11Texture2D 包装
+		Tex2D = std::make_shared<D3D11Texture2D>(D3D11RHI);
+		if (!Tex2D->CreateFromExistingTexture(existingTexture, format)) {
+			return false;
+		}
+
 		return true;
 	}
 

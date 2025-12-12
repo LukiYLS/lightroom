@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "RHI.h"
 
 namespace RenderCore

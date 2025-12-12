@@ -1,4 +1,4 @@
-#include "RHICachedStates.h"
+﻿#include "RHICachedStates.h"
 #include "RHIStaticState.h"
 
 namespace RenderCore

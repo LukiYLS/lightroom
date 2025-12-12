@@ -1,4 +1,4 @@
-#include "DynamicRHI.h"
+﻿#include "DynamicRHI.h"
 #include "D3D11RHI.h"
 
 namespace RenderCore

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "EnumAsByte.h"
 #include "TypeHash.h"
 #include "RHIDefinitions.h"

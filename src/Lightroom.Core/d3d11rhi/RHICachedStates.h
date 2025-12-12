@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "RHIState.h"
 
 namespace RenderCore

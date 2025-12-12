@@ -1,4 +1,4 @@
-#include "D3D11Texture2D.h"
+﻿#include "D3D11Texture2D.h"
 #include "RHIDefinitions.h"
 #include "D3D11RHI.h"
 #include "Common.h"
@@ -397,6 +397,78 @@ namespace RenderCore
 	ID3D11DepthStencilView* D3D11Texture2D::GetDSV() const
 	{
 		return TexDSV.Get();
+	}
+
+	bool D3D11Texture2D::CreateFromExistingTexture(ID3D11Texture2D* existingTexture, EPixelFormat format)
+	{
+		if (!existingTexture) {
+			return false;
+		}
+
+		// 保存现有纹理的引用
+		Tex2D = existingTexture;
+
+		// 获取纹理描述
+		D3D11_TEXTURE2D_DESC desc;
+		existingTexture->GetDesc(&desc);
+
+		// 设置成员变量
+		Size.x = (int32_t)desc.Width;
+		Size.y = (int32_t)desc.Height;
+		NumMips = desc.MipLevels;
+		Format = format;
+		bIsMultisampled = desc.SampleDesc.Count > 1;
+
+		auto Device = D3D11RHI->GetDevice();
+		if (!Device) {
+			return false;
+		}
+
+		HRESULT hr;
+
+		// 创建 SRV（如果纹理支持）
+		if (desc.BindFlags & D3D11_BIND_SHADER_RESOURCE) {
+			D3D11_SHADER_RESOURCE_VIEW_DESC SRVDesc;
+			memset(&SRVDesc, 0, sizeof(SRVDesc));
+			SRVDesc.Format = desc.Format;
+
+			if (bIsMultisampled) {
+				SRVDesc.ViewDimension = D3D_SRV_DIMENSION_TEXTURE2DMS;
+			} else {
+				SRVDesc.ViewDimension = D3D_SRV_DIMENSION_TEXTURE2D;
+				SRVDesc.Texture2D.MostDetailedMip = 0;
+				SRVDesc.Texture2D.MipLevels = NumMips;
+			}
+
+			hr = Device->CreateShaderResourceView(existingTexture, &SRVDesc, TexSRV.GetAddressOf());
+			if (FAILED(hr)) {
+				return false;
+			}
+		}
+
+		// 创建 RTV（如果纹理支持）
+		if (desc.BindFlags & D3D11_BIND_RENDER_TARGET) {
+			for (uint32_t MipIndex = 0; MipIndex < NumMips; MipIndex++) {
+				D3D11_RENDER_TARGET_VIEW_DESC RTVDesc;
+				memset(&RTVDesc, 0, sizeof(RTVDesc));
+				RTVDesc.Format = desc.Format;
+				if (bIsMultisampled) {
+					RTVDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2DMS;
+				} else {
+					RTVDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+					RTVDesc.Texture2D.MipSlice = MipIndex;
+				}
+
+				ComPtr<ID3D11RenderTargetView> TexRTV;
+				hr = Device->CreateRenderTargetView(existingTexture, &RTVDesc, TexRTV.GetAddressOf());
+				if (FAILED(hr)) {
+					return false;
+				}
+				TexRTVS[MipIndex].emplace_back(TexRTV);
+			}
+		}
+
+		return true;
 	}
 
 }

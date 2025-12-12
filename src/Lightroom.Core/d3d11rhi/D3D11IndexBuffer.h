@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "RHIIndexBuffer.h"
 #include "Common.h"
 #include <memory>
