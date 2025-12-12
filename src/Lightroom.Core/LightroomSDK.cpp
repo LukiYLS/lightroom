@@ -38,9 +38,7 @@ struct RenderTargetData {
 
 static std::unordered_map<void*, std::unique_ptr<RenderTargetData>> g_RenderTargetData;
 
-extern "C" {
-
-LIGHTROOM_API bool InitSDK() {
+bool InitSDK() {
     try {
         std::cout << "[SDK] Initializing Lightroom Core SDK..." << std::endl;
         
@@ -81,7 +79,7 @@ LIGHTROOM_API bool InitSDK() {
     }
 }
 
-LIGHTROOM_API void ShutdownSDK() {
+void ShutdownSDK() {
     std::cout << "[SDK] Shutting down..." << std::endl;
     
     // 清理所有渲染目标数据
@@ -108,18 +106,11 @@ LIGHTROOM_API void ShutdownSDK() {
     CoUninitialize();
 }
 
-LIGHTROOM_API bool ProcessImage(const char* inputPath, const char* outputPath, float brightness, float contrast) {
-    if (!inputPath || !outputPath) return false;
-    std::cout << "[SDK] Processing Image: " << inputPath << std::endl;
-    // TODO: 实现图片处理逻辑
-    return true;
-}
-
-LIGHTROOM_API int GetSDKVersion() {
+int GetSDKVersion() {
     return 100; // v1.0.0
 }
 
-LIGHTROOM_API void* CreateRenderTarget(uint32_t width, uint32_t height) {
+void* CreateRenderTarget(uint32_t width, uint32_t height) {
     if (!g_RenderTargetManager) {
         std::cerr << "[SDK] RenderTargetManager not initialized" << std::endl;
         return nullptr;
@@ -147,7 +138,7 @@ LIGHTROOM_API void* CreateRenderTarget(uint32_t width, uint32_t height) {
     return handle;
 }
 
-LIGHTROOM_API void DestroyRenderTarget(void* renderTargetHandle) {
+void DestroyRenderTarget(void* renderTargetHandle) {
     if (!renderTargetHandle) return;
     
     // 清理渲染目标数据
@@ -159,7 +150,7 @@ LIGHTROOM_API void DestroyRenderTarget(void* renderTargetHandle) {
     }
 }
 
-LIGHTROOM_API void* GetRenderTargetSharedHandle(void* renderTargetHandle) {
+void* GetRenderTargetSharedHandle(void* renderTargetHandle) {
     if (!g_RenderTargetManager) {
         return nullptr;
     }
@@ -220,7 +211,7 @@ LIGHTROOM_API bool LoadImageToTarget(void* renderTargetHandle, const char* image
     }
 }
 
-LIGHTROOM_API void RenderToTarget(void* renderTargetHandle) {
+void RenderToTarget(void* renderTargetHandle) {
     if (!renderTargetHandle || !g_RenderTargetManager) {
         return;
     }
@@ -342,7 +333,7 @@ LIGHTROOM_API void RenderToTarget(void* renderTargetHandle) {
     }
 }
 
-LIGHTROOM_API void ResizeRenderTarget(void* renderTargetHandle, uint32_t width, uint32_t height) {
+void ResizeRenderTarget(void* renderTargetHandle, uint32_t width, uint32_t height) {
     if (!renderTargetHandle || !g_RenderTargetManager) {
         return;
     }
@@ -353,4 +344,3 @@ LIGHTROOM_API void ResizeRenderTarget(void* renderTargetHandle, uint32_t width, 
     }
 }
 
-} // extern "C"

@@ -1,11 +1,11 @@
 EXPORTS
     InitSDK
     ShutdownSDK
-    ProcessImage
     GetSDKVersion
     CreateRenderTarget
     DestroyRenderTarget
     GetRenderTargetSharedHandle
     RenderToTarget
     ResizeRenderTarget
+
 

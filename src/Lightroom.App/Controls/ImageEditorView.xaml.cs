@@ -173,26 +173,6 @@ namespace Lightroom.App.Controls
                         if (_d3dImage.PixelWidth > 0 && _d3dImage.PixelHeight > 0)
                         {
                             _d3dImage.AddDirtyRect(new Int32Rect(0, 0, _d3dImage.PixelWidth, _d3dImage.PixelHeight));
-                            
-                            if (_renderCount % 60 == 0) // 每秒输出一次
-                            {
-                                System.Diagnostics.Debug.WriteLine($"[ImageEditorView] Render #{_renderCount}, D3DImage size: {_d3dImage.PixelWidth}x{_d3dImage.PixelHeight}, IsFrontBufferAvailable: {_d3dImage.IsFrontBufferAvailable}, Image control: {D3DImageControl.ActualWidth}x{D3DImageControl.ActualHeight}");
-                            }
-                            
-                            // 如果 IsFrontBufferAvailable 为 false，尝试重新设置
-                            if (!_d3dImage.IsFrontBufferAvailable && _renderCount == 1)
-                            {
-                                System.Diagnostics.Debug.WriteLine("[ImageEditorView] WARNING: IsFrontBufferAvailable is false, trying to reset back buffer");
-                                _d3dImage.SetBackBuffer(System.Windows.Interop.D3DResourceType.IDirect3DSurface9, IntPtr.Zero);
-                                _d3dImage.SetBackBuffer(System.Windows.Interop.D3DResourceType.IDirect3DSurface9, _sharedHandle);
-                            }
-                        }
-                        else
-                        {
-                            if (_renderCount == 1)
-                            {
-                                System.Diagnostics.Debug.WriteLine($"[ImageEditorView] WARNING: D3DImage size is 0x0!");
-                            }
                         }
                     }
                     finally

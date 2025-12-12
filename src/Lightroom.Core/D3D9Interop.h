@@ -3,8 +3,6 @@
 #include <d3d9.h>
 #include <cstdint>
 
-// D3D9 互操作模块：处理 D3D11 到 D3D9 的互操作，用于 WPF D3DImage 显示
-
 namespace LightroomCore {
 
 class D3D9Interop {
@@ -12,10 +10,8 @@ public:
     D3D9Interop();
     ~D3D9Interop();
 
-    // 初始化 D3D9Ex 设备
     bool Initialize();
 
-    // 关闭 D3D9Ex 设备
     void Shutdown();
 
     // 从 D3D11 共享句柄创建 D3D9 共享纹理
@@ -43,4 +39,5 @@ private:
 };
 
 } // namespace LightroomCore
+
 

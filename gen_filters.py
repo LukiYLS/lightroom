@@ -58,3 +58,4 @@ with open(os.path.join(base_dir, "Lightroom.Core.vcxproj.filters"), "w", encodin
 print("Generated Lightroom.Core.vcxproj.filters")
 
 
+

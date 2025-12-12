@@ -14,9 +14,6 @@ extern "C" {
 
     // 释放SDK资源
     LIGHTROOM_API void ShutdownSDK();
-
-    // 模拟图像处理（实际项目中这里会调用GPU加速逻辑）
-    LIGHTROOM_API bool ProcessImage(const char* inputPath, const char* outputPath, float brightness, float contrast);
     
     // 获取SDK版本（重命名避免与 Windows API 冲突）
     LIGHTROOM_API int GetSDKVersion();

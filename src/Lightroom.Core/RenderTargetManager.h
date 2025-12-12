@@ -9,7 +9,6 @@
 
 namespace LightroomCore {
 
-// 渲染目标管理器：管理渲染目标纹理，使用 RHI 接口
 class RenderTargetManager {
 public:
     struct RenderTargetInfo {

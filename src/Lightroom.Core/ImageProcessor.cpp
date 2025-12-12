@@ -160,3 +160,4 @@ bool ImageProcessor::LoadImageDataWithWIC(const std::wstring& imagePath, std::ve
 
 } // namespace LightroomCore
 
+
