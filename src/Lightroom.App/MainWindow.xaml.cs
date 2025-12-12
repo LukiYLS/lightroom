@@ -60,7 +60,7 @@ namespace Lightroom.App
         {
             var dialog = new Microsoft.Win32.OpenFileDialog
             {
-                Filter = "图片文件|*.jpg;*.jpeg;*.png;*.tiff;*.raw|所有文件|*.*",
+                Filter = "图片文件|*.jpg;*.jpeg;*.png;*.tiff;*.raw;*.cr2;*.cr3;*.nef;*.nrw;*.arw;*.srf;*.dng;*.orf;*.raf;*.rw2;*.pef;*.ptx;*.x3f;*.3fr;*.fff;*.mef;*.mos|RAW 文件|*.raw;*.cr2;*.cr3;*.nef;*.nrw;*.arw;*.srf;*.dng;*.orf;*.raf;*.rw2;*.pef;*.ptx;*.x3f;*.3fr;*.fff;*.mef;*.mos|标准图片|*.jpg;*.jpeg;*.png;*.tiff;*.bmp;*.gif|所有文件|*.*",
                 Multiselect = true
             };
 

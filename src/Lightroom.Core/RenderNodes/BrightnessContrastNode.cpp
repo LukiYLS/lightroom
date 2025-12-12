@@ -1,4 +1,4 @@
-#include "BrightnessContrastNode.h"
+﻿#include "BrightnessContrastNode.h"
 
 namespace LightroomCore {
 
@@ -43,4 +43,5 @@ bool BrightnessContrastNode::Execute(std::shared_ptr<RenderCore::RHITexture2D> i
 }
 
 } // namespace LightroomCore
+
 

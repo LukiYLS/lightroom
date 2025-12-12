@@ -70,6 +70,10 @@
     </ClCompile>
     <ClCompile Include="D3D9Interop.cpp" />
     <ClCompile Include="ImageProcessor.cpp" />
+    <ClCompile Include="LibRawWrapper.cpp" />
+    <ClCompile Include="RAWImageLoader.cpp" />
+    <ClCompile Include="RAWProcessor.cpp" />
+    <ClCompile Include="StandardImageLoader.cpp" />
     <ClCompile Include="RenderTargetManager.cpp" />
     <ClCompile Include="RenderGraph.cpp" />
     <ClCompile Include="RenderNodes\RenderNode.cpp">
@@ -84,11 +88,21 @@
     <ClCompile Include="RenderNodes\BrightnessContrastNode.cpp">
       <Filter>RenderNodes</Filter>
     </ClCompile>
+    <ClCompile Include="RenderNodes\RAWDevelopNode.cpp">
+      <Filter>RenderNodes</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="LightroomSDK.h" />
+    <ClInclude Include="LightroomSDKTypes.h" />
     <ClInclude Include="D3D9Interop.h" />
+    <ClInclude Include="ImageLoader.h" />
     <ClInclude Include="ImageProcessor.h" />
+    <ClInclude Include="LibRawWrapper.h" />
+    <ClInclude Include="RAWImageInfo.h" />
+    <ClInclude Include="RAWImageLoader.h" />
+    <ClInclude Include="RAWProcessor.h" />
+    <ClInclude Include="StandardImageLoader.h" />
     <ClInclude Include="RenderTargetManager.h" />
     <ClInclude Include="RenderGraph.h" />
     <ClInclude Include="RenderNodes\RenderNode.h">
@@ -101,6 +115,9 @@
       <Filter>RenderNodes</Filter>
     </ClInclude>
     <ClInclude Include="RenderNodes\BrightnessContrastNode.h">
+      <Filter>RenderNodes</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderNodes\RAWDevelopNode.h">
       <Filter>RenderNodes</Filter>
     </ClInclude>
     <ClInclude Include="d3d11rhi\Common.h">

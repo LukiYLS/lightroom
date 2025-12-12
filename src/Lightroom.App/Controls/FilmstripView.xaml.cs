@@ -16,7 +16,12 @@ namespace Lightroom.App.Controls
         private List<ThumbnailItem>? _thumbnailItems;
 
         // 支持的图片格式
-        private static readonly string[] SupportedExtensions = { ".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif", ".gif", ".raw", ".cr2", ".nef", ".arw" };
+        private static readonly string[] SupportedExtensions = { 
+            ".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif", ".gif",  // 标准格式
+            ".raw", ".cr2", ".cr3", ".nef", ".nrw", ".arw", ".srf",    // Canon, Nikon, Sony
+            ".dng", ".orf", ".raf", ".rw2", ".pef", ".ptx",            // Adobe, Olympus, Fujifilm, Panasonic, Pentax
+            ".x3f", ".3fr", ".fff", ".mef", ".mos"                     // Sigma, Hasselblad, Mamiya, Leaf
+        };
 
         public FilmstripView()
         {

@@ -1,4 +1,4 @@
-#include "ScaleNode.h"
+﻿#include "ScaleNode.h"
 #include "../d3d11rhi/D3D11RHI.h"
 #include "../d3d11rhi/D3D11VertexBuffer.h"
 #include "../d3d11rhi/RHI.h"

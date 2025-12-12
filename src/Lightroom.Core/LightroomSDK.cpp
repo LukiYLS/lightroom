@@ -1,16 +1,21 @@
 ﻿#include "LightroomSDK.h"
 #include "D3D9Interop.h"
 #include "ImageProcessor.h"
+#include "ImageLoader.h"
+#include "RAWImageInfo.h"
 #include "RenderTargetManager.h"
 #include "RenderGraph.h"
 #include "RenderNodes/RenderNode.h"
 #include "RenderNodes/PassthroughNode.h"
 #include "RenderNodes/ScaleNode.h"
 #include "RenderNodes/BrightnessContrastNode.h"
+#include "RenderNodes/RAWDevelopNode.h"
+#include "RAWProcessor.h"
 #include <iostream>
 #include <string>
 #include <unordered_map>
 #include <memory>
+#include <cstring>
 
 #include "d3d11rhi/Common.h"
 #include "d3d11rhi/DynamicRHI.h"
@@ -35,8 +40,10 @@ struct RenderTargetData {
     std::shared_ptr<RHITexture2D> ImageTexture;  // 加载的图片纹理
     std::unique_ptr<RenderGraph> RenderGraph;     // 渲染图
     bool bHasImage;
+    LightroomCore::ImageFormat ImageFormat;      // 图片格式（Standard 或 RAW）
+    std::unique_ptr<LightroomCore::RAWImageInfo> RAWInfo;  // RAW 信息（仅在 RAW 格式时有效）
     
-    RenderTargetData() : bHasImage(false) {}
+    RenderTargetData() : bHasImage(false), ImageFormat(LightroomCore::ImageFormat::Unknown) {}
 };
 
 static std::unordered_map<void*, std::unique_ptr<RenderTargetData>> g_RenderTargetData;
@@ -125,12 +132,8 @@ void* CreateRenderTarget(uint32_t width, uint32_t height) {
         return nullptr;
     }
     
-    // 创建关联的渲染图
+    // 创建关联的渲染图（初始为空，加载图片时再添加节点）
     auto renderGraph = std::make_unique<RenderGraph>(g_DynamicRHI);
-    
-    // 默认添加缩放节点（支持缩放和平移功能）
-    auto scaleNode = std::make_shared<ScaleNode>(g_DynamicRHI);
-    renderGraph->AddNode(scaleNode);
     
     // 存储渲染目标数据
     auto data = std::make_unique<RenderTargetData>();
@@ -184,20 +187,62 @@ bool LoadImageToTarget(void* renderTargetHandle, const char* imagePath) {
         }
         
         data->bHasImage = true;
+        data->ImageFormat = g_ImageProcessor->GetLastImageFormat();
         
-        // 根据图片尺寸和渲染目标尺寸，决定使用哪个节点
+        // 如果是 RAW 格式，保存 RAW 信息
+        if (data->ImageFormat == LightroomCore::ImageFormat::RAW) {
+            const LightroomCore::RAWImageInfo* rawInfo = g_ImageProcessor->GetRAWInfo();
+            if (rawInfo) {
+                data->RAWInfo = std::make_unique<LightroomCore::RAWImageInfo>(*rawInfo);
+            }
+        } else {
+            data->RAWInfo.reset();
+        }
+        
+        // 根据图片格式和尺寸，决定使用哪个节点
         auto* renderTargetInfo = g_RenderTargetManager->GetRenderTargetInfo(renderTargetHandle);
         if (renderTargetInfo) {
             uint32_t imageWidth, imageHeight;
             g_ImageProcessor->GetLastImageSize(imageWidth, imageHeight);
             
-            // 清除旧的渲染图
+            // 清除旧的渲染图（包括默认的 ScaleNode）
             data->RenderGraph->Clear();
             
-            // 总是使用缩放节点以支持缩放和平移功能
+            // 如果是 RAW 格式，添加 RAWDevelopNode 进行 RAW 开发处理
+            if (data->ImageFormat == LightroomCore::ImageFormat::RAW && data->RAWInfo) {
+                auto rawDevelopNode = std::make_shared<RAWDevelopNode>(g_DynamicRHI);
+                rawDevelopNode->SetRAWInfo(*data->RAWInfo);
+                
+                // 设置默认开发参数
+                // 注意：由于 LibRaw 已经应用了相机白平衡，这里设置相对调整
+                LightroomCore::RAWDevelopParamsInternal defaultParams;
+                // 白平衡系数设为 1.0（不调整，使用 LibRaw 处理的结果）
+                defaultParams.whiteBalance[0] = 1.0f;  // R
+                defaultParams.whiteBalance[1] = 1.0f;  // G1
+                defaultParams.whiteBalance[2] = 1.0f;  // B
+                defaultParams.whiteBalance[3] = 1.0f;  // G2
+                defaultParams.exposure = 0.0f;
+                defaultParams.contrast = 0.0f;
+                defaultParams.saturation = 1.0f;
+                defaultParams.highlights = 0.0f;
+                defaultParams.shadows = 0.0f;
+                defaultParams.temperature = 5500.0f;  // 默认日光色温
+                defaultParams.tint = 0.0f;
+                defaultParams.enableDemosaicing = false;  // 已经在 LibRaw 中处理
+                defaultParams.demosaicAlgorithm = 0;
+                rawDevelopNode->SetDevelopParams(defaultParams);
+                data->RenderGraph->AddNode(rawDevelopNode);
+            }
+            
+            // 总是添加缩放节点以支持缩放和平移功能
             auto scaleNode = std::make_shared<ScaleNode>(g_DynamicRHI);
             scaleNode->SetInputImageSize(imageWidth, imageHeight);
+            scaleNode->SetInputImageSize(imageWidth, imageHeight);
             data->RenderGraph->AddNode(scaleNode);
+            
+            std::cout << "[SDK] Image loaded: " << imageWidth << "x" << imageHeight 
+                      << ", Format: " << (data->ImageFormat == LightroomCore::ImageFormat::RAW ? "RAW" : "Standard")
+                      << ", Nodes: " << (data->ImageFormat == LightroomCore::ImageFormat::RAW ? "RAWDevelop+Scale" : "Scale") << std::endl;
         }
         
         return true;
@@ -347,6 +392,153 @@ void SetRenderTargetZoom(void* renderTargetHandle, double zoomLevel, double panX
                     g_ImageProcessor->GetLastImageSize(imageWidth, imageHeight);
                     scaleNode->SetInputImageSize(imageWidth, imageHeight);
                 }
+            }
+            break;
+        }
+    }
+}
+
+bool IsRAWFormat(const char* imagePath) {
+    if (!imagePath || !g_ImageProcessor) {
+        return false;
+    }
+    
+    // 转换路径为宽字符
+    std::wstring wpath;
+    int pathLen = MultiByteToWideChar(CP_UTF8, 0, imagePath, -1, nullptr, 0);
+    if (pathLen > 0) {
+        wpath.resize(pathLen);
+        MultiByteToWideChar(CP_UTF8, 0, imagePath, -1, &wpath[0], pathLen);
+        if (!wpath.empty() && wpath.back() == L'\0') {
+            wpath.pop_back();
+        }
+    } else {
+        pathLen = MultiByteToWideChar(CP_ACP, 0, imagePath, -1, nullptr, 0);
+        if (pathLen > 0) {
+            wpath.resize(pathLen);
+            MultiByteToWideChar(CP_ACP, 0, imagePath, -1, &wpath[0], pathLen);
+            if (!wpath.empty() && wpath.back() == L'\0') {
+                wpath.pop_back();
+            }
+        } else {
+            return false;
+        }
+    }
+    
+    return g_ImageProcessor->IsRAWFormat(wpath);
+}
+
+bool GetRAWMetadata(void* renderTargetHandle, RAWImageMetadata* outMetadata) {
+    if (!renderTargetHandle || !outMetadata) {
+        return false;
+    }
+    
+    auto it = g_RenderTargetData.find(renderTargetHandle);
+    if (it == g_RenderTargetData.end()) {
+        return false;
+    }
+    
+    auto& data = it->second;
+    if (!data || data->ImageFormat != LightroomCore::ImageFormat::RAW || !data->RAWInfo) {
+        return false;
+    }
+    
+    // 填充元数据
+    outMetadata->width = data->RAWInfo->width;
+    outMetadata->height = data->RAWInfo->height;
+    outMetadata->bitsPerPixel = data->RAWInfo->bitsPerPixel;
+    outMetadata->bayerPattern = data->RAWInfo->bayerPattern;
+    outMetadata->whiteBalance[0] = data->RAWInfo->whiteBalance[0];
+    outMetadata->whiteBalance[1] = data->RAWInfo->whiteBalance[1];
+    outMetadata->whiteBalance[2] = data->RAWInfo->whiteBalance[2];
+    outMetadata->whiteBalance[3] = data->RAWInfo->whiteBalance[3];
+    outMetadata->iso = data->RAWInfo->iso;
+    outMetadata->aperture = data->RAWInfo->aperture;
+    outMetadata->shutterSpeed = data->RAWInfo->shutterSpeed;
+    outMetadata->focalLength = data->RAWInfo->focalLength;
+    
+    // 复制字符串（确保不溢出）
+    strncpy_s(outMetadata->cameraModel, sizeof(outMetadata->cameraModel), 
+              data->RAWInfo->cameraModel.c_str(), _TRUNCATE);
+    strncpy_s(outMetadata->lensModel, sizeof(outMetadata->lensModel), 
+              data->RAWInfo->lensModel.c_str(), _TRUNCATE);
+    
+    return true;
+}
+
+void SetRAWDevelopParams(void* renderTargetHandle, const RAWDevelopParams* params) {
+    if (!renderTargetHandle || !params) {
+        return;
+    }
+    
+    auto it = g_RenderTargetData.find(renderTargetHandle);
+    if (it == g_RenderTargetData.end()) {
+        return;
+    }
+    
+    auto& data = it->second;
+    if (!data || !data->RenderGraph || data->ImageFormat != LightroomCore::ImageFormat::RAW) {
+        return;
+    }
+    
+    // 查找 RAWDevelopNode 并设置参数
+    for (size_t i = 0; i < data->RenderGraph->GetNodeCount(); ++i) {
+        auto node = data->RenderGraph->GetNode(i);
+        if (node && strcmp(node->GetName(), "RAWDevelop") == 0) {
+            auto rawDevelopNode = std::dynamic_pointer_cast<RAWDevelopNode>(node);
+            if (rawDevelopNode) {
+                // 转换 C API 结构到 C++ 内部结构
+                LightroomCore::RAWDevelopParamsInternal cppParams;
+                cppParams.whiteBalance[0] = params->whiteBalance[0];
+                cppParams.whiteBalance[1] = params->whiteBalance[1];
+                cppParams.whiteBalance[2] = params->whiteBalance[2];
+                cppParams.whiteBalance[3] = params->whiteBalance[3];
+                cppParams.exposure = params->exposure;
+                cppParams.contrast = params->contrast;
+                cppParams.saturation = params->saturation;
+                cppParams.highlights = params->highlights;
+                cppParams.shadows = params->shadows;
+                cppParams.temperature = params->temperature;
+                cppParams.tint = params->tint;
+                // enableDemosaicing 和 demosaicAlgorithm 使用默认值（C API 暂不暴露）
+                
+                rawDevelopNode->SetDevelopParams(cppParams);
+            }
+            break;
+        }
+    }
+}
+
+void ResetRAWDevelopParams(void* renderTargetHandle) {
+    if (!renderTargetHandle) {
+        return;
+    }
+    
+    auto it = g_RenderTargetData.find(renderTargetHandle);
+    if (it == g_RenderTargetData.end()) {
+        return;
+    }
+    
+    auto& data = it->second;
+    if (!data || !data->RenderGraph || data->ImageFormat != LightroomCore::ImageFormat::RAW || !data->RAWInfo) {
+        return;
+    }
+    
+    // 查找 RAWDevelopNode 并重置为相机默认值
+    for (size_t i = 0; i < data->RenderGraph->GetNodeCount(); ++i) {
+        auto node = data->RenderGraph->GetNode(i);
+        if (node && strcmp(node->GetName(), "RAWDevelop") == 0) {
+            auto rawDevelopNode = std::dynamic_pointer_cast<RAWDevelopNode>(node);
+            if (rawDevelopNode) {
+                // 重置为相机默认白平衡
+                LightroomCore::RAWDevelopParamsInternal defaultParams;
+                defaultParams.whiteBalance[0] = data->RAWInfo->whiteBalance[0];
+                defaultParams.whiteBalance[1] = data->RAWInfo->whiteBalance[1];
+                defaultParams.whiteBalance[2] = data->RAWInfo->whiteBalance[2];
+                defaultParams.whiteBalance[3] = data->RAWInfo->whiteBalance[3];
+                // 其他参数保持默认值
+                
+                rawDevelopNode->SetDevelopParams(defaultParams);
             }
             break;
         }

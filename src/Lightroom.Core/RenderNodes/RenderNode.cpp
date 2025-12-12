@@ -1,4 +1,4 @@
-#include "RenderNode.h"
+﻿#include "RenderNode.h"
 
 namespace LightroomCore {
 
@@ -14,4 +14,5 @@ RenderNode::~RenderNode() {
 }
 
 } // namespace LightroomCore
+
 

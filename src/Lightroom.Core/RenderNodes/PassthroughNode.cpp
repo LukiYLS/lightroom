@@ -1,4 +1,4 @@
-#include "PassthroughNode.h"
+﻿#include "PassthroughNode.h"
 
 namespace LightroomCore {
 
@@ -24,4 +24,5 @@ bool PassthroughNode::Execute(std::shared_ptr<RenderCore::RHITexture2D> inputTex
 }
 
 } // namespace LightroomCore
+
 

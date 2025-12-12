@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <cstdint>
+#include "LightroomSDKTypes.h"
 
 #ifdef LIGHTROOM_CORE_EXPORTS
 #define LIGHTROOM_API __declspec(dllexport)
@@ -41,5 +42,20 @@ extern "C" {
     // zoomLevel: 缩放级别（1.0 = 100%, 2.0 = 200%, 0.5 = 50%）
     // panX, panY: 平移偏移（归一化坐标，范围 -1.0 到 1.0）
     LIGHTROOM_API void SetRenderTargetZoom(void* renderTargetHandle, double zoomLevel, double panX, double panY);
+    
+    // RAW 格式相关 API
+    // 检查文件是否为 RAW 格式
+    LIGHTROOM_API bool IsRAWFormat(const char* imagePath);
+    
+    // 获取 RAW 图片元数据（仅在加载 RAW 文件后有效）
+    // 结构体定义在 LightroomSDKTypes.h 中
+    LIGHTROOM_API bool GetRAWMetadata(void* renderTargetHandle, RAWImageMetadata* outMetadata);
+    
+    // 设置 RAW 开发参数
+    // 结构体定义在 LightroomSDKTypes.h 中
+    LIGHTROOM_API void SetRAWDevelopParams(void* renderTargetHandle, const RAWDevelopParams* params);
+    
+    // 重置 RAW 开发参数为相机默认值
+    LIGHTROOM_API void ResetRAWDevelopParams(void* renderTargetHandle);
 }
 

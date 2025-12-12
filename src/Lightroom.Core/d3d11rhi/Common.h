@@ -7,6 +7,16 @@
 #include <cmath>
 #include <random>
 #include <chrono>
+
+// 防止 Winsock 冲突 - 必须在包含任何 Windows 头文件之前
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include <Windows.h>
 #include <wrl/client.h>
 #include <iostream>

@@ -19,10 +19,13 @@
     <PropertyGroup>
       <NativeDllPath>..\..\bin\$(Configuration)\LightroomCore.dll</NativeDllPath>
       <NativePdbPath>..\..\bin\$(Configuration)\LightroomCore.pdb</NativePdbPath>
+      <LibRawDllPath>..\..\third_party\libraw\buildfiles\release-x86_64\libraw.dll</LibRawDllPath>
     </PropertyGroup>
     <Message Text="Copying native DLL from $(NativeDllPath) to $(OutDir)" Importance="high" />
     <Copy SourceFiles="$(NativeDllPath)" DestinationFolder="$(OutDir)" Condition="Exists('$(NativeDllPath)')" ContinueOnError="true" />
     <Copy SourceFiles="$(NativePdbPath)" DestinationFolder="$(OutDir)" Condition="Exists('$(NativePdbPath)')" ContinueOnError="true" />
+    <Message Text="Copying libraw.dll from $(LibRawDllPath) to $(OutDir)" Importance="high" />
+    <Copy SourceFiles="$(LibRawDllPath)" DestinationFolder="$(OutDir)" Condition="Exists('$(LibRawDllPath)')" ContinueOnError="true" />
   </Target>
   <ItemGroup>
     <Compile Remove="Controls\Window1.xaml.cs" />
