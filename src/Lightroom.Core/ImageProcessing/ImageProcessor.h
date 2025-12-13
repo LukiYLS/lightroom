@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include "d3d11rhi/DynamicRHI.h"
+#include "../d3d11rhi/DynamicRHI.h"
 #include "ImageLoader.h"
 #include "RAWImageInfo.h"
 #include <string>

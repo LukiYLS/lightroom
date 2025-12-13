@@ -1,16 +1,14 @@
 ﻿#include "LightroomSDK.h"
 #include "D3D9Interop.h"
-#include "ImageProcessor.h"
-#include "ImageLoader.h"
-#include "RAWImageInfo.h"
+#include "ImageProcessing/ImageProcessor.h"
+#include "ImageProcessing/ImageLoader.h"
+#include "ImageProcessing/RAWImageInfo.h"
 #include "RenderTargetManager.h"
 #include "RenderGraph.h"
 #include "RenderNodes/RenderNode.h"
-#include "RenderNodes/PassthroughNode.h"
 #include "RenderNodes/ScaleNode.h"
-#include "RenderNodes/BrightnessContrastNode.h"
-#include "RenderNodes/RAWDevelopNode.h"
-#include "RAWProcessor.h"
+#include "RenderNodes/ImageAdjustNode.h"
+#include "ImageProcessing/RAWProcessor.h"
 #include <iostream>
 #include <string>
 #include <unordered_map>
@@ -205,44 +203,25 @@ bool LoadImageToTarget(void* renderTargetHandle, const char* imagePath) {
             uint32_t imageWidth, imageHeight;
             g_ImageProcessor->GetLastImageSize(imageWidth, imageHeight);
             
-            // 清除旧的渲染图（包括默认的 ScaleNode）
+            // 清除旧的渲染图
             data->RenderGraph->Clear();
             
-            // 如果是 RAW 格式，添加 RAWDevelopNode 进行 RAW 开发处理
-            if (data->ImageFormat == LightroomCore::ImageFormat::RAW && data->RAWInfo) {
-                auto rawDevelopNode = std::make_shared<RAWDevelopNode>(g_DynamicRHI);
-                rawDevelopNode->SetRAWInfo(*data->RAWInfo);
-                
-                // 设置默认开发参数
-                // 注意：由于 LibRaw 已经应用了相机白平衡，这里设置相对调整
-                LightroomCore::RAWDevelopParamsInternal defaultParams;
-                // 白平衡系数设为 1.0（不调整，使用 LibRaw 处理的结果）
-                defaultParams.whiteBalance[0] = 1.0f;  // R
-                defaultParams.whiteBalance[1] = 1.0f;  // G1
-                defaultParams.whiteBalance[2] = 1.0f;  // B
-                defaultParams.whiteBalance[3] = 1.0f;  // G2
-                defaultParams.exposure = 0.0f;
-                defaultParams.contrast = 0.0f;
-                defaultParams.saturation = 1.0f;
-                defaultParams.highlights = 0.0f;
-                defaultParams.shadows = 0.0f;
-                defaultParams.temperature = 5500.0f;  // 默认日光色温
-                defaultParams.tint = 0.0f;
-                defaultParams.enableDemosaicing = false;  // 已经在 LibRaw 中处理
-                defaultParams.demosaicAlgorithm = 0;
-                rawDevelopNode->SetDevelopParams(defaultParams);
-                data->RenderGraph->AddNode(rawDevelopNode);
-            }
+            // 添加通用的图像调整节点（适用于 RAW 和标准图片）
+            auto adjustNode = std::make_shared<ImageAdjustNode>(g_DynamicRHI);
+            ImageAdjustParams defaultParams;
+            memset(&defaultParams, 0, sizeof(ImageAdjustParams));
+            defaultParams.temperature = 5500.0f;  // 默认日光色温
+            adjustNode->SetAdjustParams(defaultParams);
+            data->RenderGraph->AddNode(adjustNode);
             
             // 总是添加缩放节点以支持缩放和平移功能
             auto scaleNode = std::make_shared<ScaleNode>(g_DynamicRHI);
-            scaleNode->SetInputImageSize(imageWidth, imageHeight);
             scaleNode->SetInputImageSize(imageWidth, imageHeight);
             data->RenderGraph->AddNode(scaleNode);
             
             std::cout << "[SDK] Image loaded: " << imageWidth << "x" << imageHeight 
                       << ", Format: " << (data->ImageFormat == LightroomCore::ImageFormat::RAW ? "RAW" : "Standard")
-                      << ", Nodes: " << (data->ImageFormat == LightroomCore::ImageFormat::RAW ? "RAWDevelop+Scale" : "Scale") << std::endl;
+                      << ", Nodes: ImageAdjust+Scale" << std::endl;
         }
         
         return true;
@@ -466,7 +445,7 @@ bool GetRAWMetadata(void* renderTargetHandle, RAWImageMetadata* outMetadata) {
     return true;
 }
 
-void SetRAWDevelopParams(void* renderTargetHandle, const RAWDevelopParams* params) {
+void SetImageAdjustParams(void* renderTargetHandle, const ImageAdjustParams* params) {
     if (!renderTargetHandle || !params) {
         return;
     }
@@ -477,39 +456,24 @@ void SetRAWDevelopParams(void* renderTargetHandle, const RAWDevelopParams* param
     }
     
     auto& data = it->second;
-    if (!data || !data->RenderGraph || data->ImageFormat != LightroomCore::ImageFormat::RAW) {
+    if (!data || !data->RenderGraph) {
         return;
     }
     
-    // 查找 RAWDevelopNode 并设置参数
+    // 查找 ImageAdjustNode 并设置参数
     for (size_t i = 0; i < data->RenderGraph->GetNodeCount(); ++i) {
         auto node = data->RenderGraph->GetNode(i);
-        if (node && strcmp(node->GetName(), "RAWDevelop") == 0) {
-            auto rawDevelopNode = std::dynamic_pointer_cast<RAWDevelopNode>(node);
-            if (rawDevelopNode) {
-                // 转换 C API 结构到 C++ 内部结构
-                LightroomCore::RAWDevelopParamsInternal cppParams;
-                cppParams.whiteBalance[0] = params->whiteBalance[0];
-                cppParams.whiteBalance[1] = params->whiteBalance[1];
-                cppParams.whiteBalance[2] = params->whiteBalance[2];
-                cppParams.whiteBalance[3] = params->whiteBalance[3];
-                cppParams.exposure = params->exposure;
-                cppParams.contrast = params->contrast;
-                cppParams.saturation = params->saturation;
-                cppParams.highlights = params->highlights;
-                cppParams.shadows = params->shadows;
-                cppParams.temperature = params->temperature;
-                cppParams.tint = params->tint;
-                // enableDemosaicing 和 demosaicAlgorithm 使用默认值（C API 暂不暴露）
-                
-                rawDevelopNode->SetDevelopParams(cppParams);
+        if (node && strcmp(node->GetName(), "ImageAdjust") == 0) {
+            auto adjustNode = std::dynamic_pointer_cast<ImageAdjustNode>(node);
+            if (adjustNode) {
+                adjustNode->SetAdjustParams(*params);
             }
             break;
         }
     }
 }
 
-void ResetRAWDevelopParams(void* renderTargetHandle) {
+void ResetImageAdjustParams(void* renderTargetHandle) {
     if (!renderTargetHandle) {
         return;
     }
@@ -520,25 +484,20 @@ void ResetRAWDevelopParams(void* renderTargetHandle) {
     }
     
     auto& data = it->second;
-    if (!data || !data->RenderGraph || data->ImageFormat != LightroomCore::ImageFormat::RAW || !data->RAWInfo) {
+    if (!data || !data->RenderGraph) {
         return;
     }
     
-    // 查找 RAWDevelopNode 并重置为相机默认值
+    // 查找 ImageAdjustNode 并重置为默认值
     for (size_t i = 0; i < data->RenderGraph->GetNodeCount(); ++i) {
         auto node = data->RenderGraph->GetNode(i);
-        if (node && strcmp(node->GetName(), "RAWDevelop") == 0) {
-            auto rawDevelopNode = std::dynamic_pointer_cast<RAWDevelopNode>(node);
-            if (rawDevelopNode) {
-                // 重置为相机默认白平衡
-                LightroomCore::RAWDevelopParamsInternal defaultParams;
-                defaultParams.whiteBalance[0] = data->RAWInfo->whiteBalance[0];
-                defaultParams.whiteBalance[1] = data->RAWInfo->whiteBalance[1];
-                defaultParams.whiteBalance[2] = data->RAWInfo->whiteBalance[2];
-                defaultParams.whiteBalance[3] = data->RAWInfo->whiteBalance[3];
-                // 其他参数保持默认值
-                
-                rawDevelopNode->SetDevelopParams(defaultParams);
+        if (node && strcmp(node->GetName(), "ImageAdjust") == 0) {
+            auto adjustNode = std::dynamic_pointer_cast<ImageAdjustNode>(node);
+            if (adjustNode) {
+                ImageAdjustParams defaultParams;
+                memset(&defaultParams, 0, sizeof(ImageAdjustParams));
+                defaultParams.temperature = 5500.0f;  // 默认日光色温
+                adjustNode->SetAdjustParams(defaultParams);
             }
             break;
         }

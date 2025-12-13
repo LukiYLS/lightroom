@@ -35,6 +35,7 @@ namespace Lightroom.App.Controls
             string valueText = parameterName switch
             {
                 "Exposure" => $"{value:F2}",
+                "Temperature" => $"{value:F0}",
                 _ => $"{value:F0}"
             };
 
@@ -58,6 +59,30 @@ namespace Lightroom.App.Controls
                 case "Blacks":
                     BlacksValue.Text = valueText;
                     break;
+                case "Temperature":
+                    TemperatureValue.Text = valueText;
+                    break;
+                case "Tint":
+                    TintValue.Text = valueText;
+                    break;
+                case "Vibrance":
+                    VibranceValue.Text = valueText;
+                    break;
+                case "Saturation":
+                    SaturationValue.Text = valueText;
+                    break;
+                case "Sharpness":
+                    SharpnessValue.Text = valueText;
+                    break;
+                case "NoiseReduction":
+                    NoiseReductionValue.Text = valueText;
+                    break;
+                case "Vignette":
+                    VignetteValue.Text = valueText;
+                    break;
+                case "Grain":
+                    GrainValue.Text = valueText;
+                    break;
             }
         }
 
@@ -69,9 +94,14 @@ namespace Lightroom.App.Controls
             ShadowsSlider.Value = 0;
             WhitesSlider.Value = 0;
             BlacksSlider.Value = 0;
+            TemperatureSlider.Value = 5500;
+            TintSlider.Value = 0;
+            VibranceSlider.Value = 0;
+            SaturationSlider.Value = 0;
+            SharpnessSlider.Value = 0;
+            NoiseReductionSlider.Value = 0;
+            VignetteSlider.Value = 0;
+            GrainSlider.Value = 0;
         }
     }
 }
-
-
-

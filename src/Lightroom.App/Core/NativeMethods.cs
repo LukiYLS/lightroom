@@ -40,6 +40,84 @@ namespace Lightroom.App.Core
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         public static extern void SetRenderTargetZoom(IntPtr renderTargetHandle, double zoomLevel, double panX, double panY);
+
+        // 图像调整参数结构（与 C++ 中的 ImageAdjustParams 对应）
+        [StructLayout(LayoutKind.Sequential)]
+        public struct ImageAdjustParams
+        {
+            // 基本调整
+            public float exposure;
+            public float contrast;
+            public float highlights;
+            public float shadows;
+            public float whites;
+            public float blacks;
+            
+            // 白平衡
+            public float temperature;
+            public float tint;
+            
+            // 颜色调整
+            public float vibrance;
+            public float saturation;
+            
+            // HSL 调整 - 色相
+            public float hueRed;
+            public float hueOrange;
+            public float hueYellow;
+            public float hueGreen;
+            public float hueAqua;
+            public float hueBlue;
+            public float huePurple;
+            public float hueMagenta;
+            
+            // HSL 调整 - 饱和度
+            public float satRed;
+            public float satOrange;
+            public float satYellow;
+            public float satGreen;
+            public float satAqua;
+            public float satBlue;
+            public float satPurple;
+            public float satMagenta;
+            
+            // HSL 调整 - 明亮度
+            public float lumRed;
+            public float lumOrange;
+            public float lumYellow;
+            public float lumGreen;
+            public float lumAqua;
+            public float lumBlue;
+            public float lumPurple;
+            public float lumMagenta;
+            
+            // 细节调整
+            public float sharpness;
+            public float noiseReduction;
+            
+            // 镜头校正
+            public float lensDistortion;
+            public float chromaticAberration;
+            
+            // 效果
+            public float vignette;
+            public float grain;
+            
+            // 校准
+            public float shadowTint;
+            public float redHue;
+            public float redSaturation;
+            public float greenHue;
+            public float greenSaturation;
+            public float blueHue;
+            public float blueSaturation;
+        }
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern void SetImageAdjustParams(IntPtr renderTargetHandle, ref ImageAdjustParams adjustParams);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern void ResetImageAdjustParams(IntPtr renderTargetHandle);
     }
 }
 

@@ -69,26 +69,30 @@
       <Filter>d3d11rhi</Filter>
     </ClCompile>
     <ClCompile Include="D3D9Interop.cpp" />
-    <ClCompile Include="ImageProcessor.cpp" />
-    <ClCompile Include="LibRawWrapper.cpp" />
-    <ClCompile Include="RAWImageLoader.cpp" />
-    <ClCompile Include="RAWProcessor.cpp" />
-    <ClCompile Include="StandardImageLoader.cpp" />
+    <ClCompile Include="ImageProcessing\ImageProcessor.cpp">
+      <Filter>ImageProcessing</Filter>
+    </ClCompile>
+    <ClCompile Include="ImageProcessing\LibRawWrapper.cpp">
+      <Filter>ImageProcessing</Filter>
+    </ClCompile>
+    <ClCompile Include="ImageProcessing\RAWImageLoader.cpp">
+      <Filter>ImageProcessing</Filter>
+    </ClCompile>
+    <ClCompile Include="ImageProcessing\RAWProcessor.cpp">
+      <Filter>ImageProcessing</Filter>
+    </ClCompile>
+    <ClCompile Include="ImageProcessing\StandardImageLoader.cpp">
+      <Filter>ImageProcessing</Filter>
+    </ClCompile>
     <ClCompile Include="RenderTargetManager.cpp" />
     <ClCompile Include="RenderGraph.cpp" />
     <ClCompile Include="RenderNodes\RenderNode.cpp">
       <Filter>RenderNodes</Filter>
     </ClCompile>
-    <ClCompile Include="RenderNodes\PassthroughNode.cpp">
-      <Filter>RenderNodes</Filter>
-    </ClCompile>
     <ClCompile Include="RenderNodes\ScaleNode.cpp">
       <Filter>RenderNodes</Filter>
     </ClCompile>
-    <ClCompile Include="RenderNodes\BrightnessContrastNode.cpp">
-      <Filter>RenderNodes</Filter>
-    </ClCompile>
-    <ClCompile Include="RenderNodes\RAWDevelopNode.cpp">
+    <ClCompile Include="RenderNodes\ImageAdjustNode.cpp">
       <Filter>RenderNodes</Filter>
     </ClCompile>
   </ItemGroup>
@@ -96,28 +100,36 @@
     <ClInclude Include="LightroomSDK.h" />
     <ClInclude Include="LightroomSDKTypes.h" />
     <ClInclude Include="D3D9Interop.h" />
-    <ClInclude Include="ImageLoader.h" />
-    <ClInclude Include="ImageProcessor.h" />
-    <ClInclude Include="LibRawWrapper.h" />
-    <ClInclude Include="RAWImageInfo.h" />
-    <ClInclude Include="RAWImageLoader.h" />
-    <ClInclude Include="RAWProcessor.h" />
-    <ClInclude Include="StandardImageLoader.h" />
+    <ClInclude Include="ImageProcessing\ImageLoader.h">
+      <Filter>ImageProcessing</Filter>
+    </ClInclude>
+    <ClInclude Include="ImageProcessing\ImageProcessor.h">
+      <Filter>ImageProcessing</Filter>
+    </ClInclude>
+    <ClInclude Include="ImageProcessing\LibRawWrapper.h">
+      <Filter>ImageProcessing</Filter>
+    </ClInclude>
+    <ClInclude Include="ImageProcessing\RAWImageInfo.h">
+      <Filter>ImageProcessing</Filter>
+    </ClInclude>
+    <ClInclude Include="ImageProcessing\RAWImageLoader.h">
+      <Filter>ImageProcessing</Filter>
+    </ClInclude>
+    <ClInclude Include="ImageProcessing\RAWProcessor.h">
+      <Filter>ImageProcessing</Filter>
+    </ClInclude>
+    <ClInclude Include="ImageProcessing\StandardImageLoader.h">
+      <Filter>ImageProcessing</Filter>
+    </ClInclude>
     <ClInclude Include="RenderTargetManager.h" />
     <ClInclude Include="RenderGraph.h" />
     <ClInclude Include="RenderNodes\RenderNode.h">
       <Filter>RenderNodes</Filter>
     </ClInclude>
-    <ClInclude Include="RenderNodes\PassthroughNode.h">
-      <Filter>RenderNodes</Filter>
-    </ClInclude>
     <ClInclude Include="RenderNodes\ScaleNode.h">
       <Filter>RenderNodes</Filter>
     </ClInclude>
-    <ClInclude Include="RenderNodes\BrightnessContrastNode.h">
-      <Filter>RenderNodes</Filter>
-    </ClInclude>
-    <ClInclude Include="RenderNodes\RAWDevelopNode.h">
+    <ClInclude Include="RenderNodes\ImageAdjustNode.h">
       <Filter>RenderNodes</Filter>
     </ClInclude>
     <ClInclude Include="d3d11rhi\Common.h">
@@ -250,6 +262,9 @@
     </Filter>
     <Filter Include="RenderNodes">
       <UniqueIdentifier>{a1b2c3d4-5e6f-7a8b-9c0d-1e2f3a4b5c6d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ImageProcessing">
+      <UniqueIdentifier>{b2c3d4e5-6f7a-8b9c-0d1e-2f3a4b5c6d7e}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

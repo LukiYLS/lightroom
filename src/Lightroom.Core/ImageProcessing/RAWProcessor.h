@@ -1,7 +1,7 @@
 ﻿#pragma once
 
 #include "RAWImageInfo.h"
-#include "d3d11rhi/DynamicRHI.h"
+#include "../d3d11rhi/DynamicRHI.h"
 #include <memory>
 #include <vector>
 

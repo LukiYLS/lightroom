@@ -134,3 +134,4 @@ Ensure compliance with the chosen license.
 Once LibRaw is integrated, uncomment `#define LIBRAW_AVAILABLE` in `LibRawWrapper.h` or add it to project preprocessor definitions.
 
 
+

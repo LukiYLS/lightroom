@@ -150,3 +150,4 @@ A: 使用 Dependency Walker 或 Process Monitor 可以精确定位缺失的 DLL�
 
 A: 可以，但会增加 DLL 大小。对于 `libraw.dll`，建议保持动态链接，因为它可能很大。
 
+

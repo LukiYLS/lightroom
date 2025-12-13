@@ -142,12 +142,32 @@ namespace Lightroom.App
         {
             _adjustments[args.parameter] = args.value;
             
-            // TODO: 将调整参数传递给 C++ SDK 进行渲染
+            // 将调整参数传递给 C++ SDK 进行渲染
             var renderHandle = ImageEditorViewControl.GetRenderTargetHandle();
             if (renderHandle != IntPtr.Zero)
             {
-                // 这里可以根据调整参数更新渲染
-                // 例如：根据曝光度、对比度等调整渲染
+                // 构建完整的调整参数结构
+                var adjustParams = new NativeMethods.ImageAdjustParams();
+                
+                // 从字典中获取所有调整值
+                adjustParams.exposure = (float)(_adjustments.GetValueOrDefault("Exposure", 0.0));
+                adjustParams.contrast = (float)(_adjustments.GetValueOrDefault("Contrast", 0.0));
+                adjustParams.highlights = (float)(_adjustments.GetValueOrDefault("Highlights", 0.0));
+                adjustParams.shadows = (float)(_adjustments.GetValueOrDefault("Shadows", 0.0));
+                adjustParams.whites = (float)(_adjustments.GetValueOrDefault("Whites", 0.0));
+                adjustParams.blacks = (float)(_adjustments.GetValueOrDefault("Blacks", 0.0));
+                adjustParams.temperature = (float)(_adjustments.GetValueOrDefault("Temperature", 5500.0));
+                adjustParams.tint = (float)(_adjustments.GetValueOrDefault("Tint", 0.0));
+                adjustParams.vibrance = (float)(_adjustments.GetValueOrDefault("Vibrance", 0.0));
+                adjustParams.saturation = (float)(_adjustments.GetValueOrDefault("Saturation", 0.0));
+                adjustParams.sharpness = (float)(_adjustments.GetValueOrDefault("Sharpness", 0.0));
+                adjustParams.noiseReduction = (float)(_adjustments.GetValueOrDefault("NoiseReduction", 0.0));
+                adjustParams.vignette = (float)(_adjustments.GetValueOrDefault("Vignette", 0.0));
+                adjustParams.grain = (float)(_adjustments.GetValueOrDefault("Grain", 0.0));
+                
+                // 设置调整参数并重新渲染
+                NativeMethods.SetImageAdjustParams(renderHandle, ref adjustParams);
+                NativeMethods.RenderToTarget(renderHandle);
             }
         }
 

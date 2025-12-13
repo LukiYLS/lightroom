@@ -550,3 +550,4 @@ src/Lightroom.Core/
 This design provides a comprehensive foundation for RAW format support while maintaining compatibility with the existing architecture. The modular approach allows for incremental implementation and easy extension with new features and formats.
 
 
+

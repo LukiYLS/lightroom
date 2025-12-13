@@ -51,11 +51,11 @@ extern "C" {
     // 结构体定义在 LightroomSDKTypes.h 中
     LIGHTROOM_API bool GetRAWMetadata(void* renderTargetHandle, RAWImageMetadata* outMetadata);
     
-    // 设置 RAW 开发参数
+    // 设置图像调整参数（通用，适用于 RAW 和标准图片）
     // 结构体定义在 LightroomSDKTypes.h 中
-    LIGHTROOM_API void SetRAWDevelopParams(void* renderTargetHandle, const RAWDevelopParams* params);
+    LIGHTROOM_API void SetImageAdjustParams(void* renderTargetHandle, const ImageAdjustParams* params);
     
-    // 重置 RAW 开发参数为相机默认值
-    LIGHTROOM_API void ResetRAWDevelopParams(void* renderTargetHandle);
+    // 重置图像调整参数为默认值
+    LIGHTROOM_API void ResetImageAdjustParams(void* renderTargetHandle);
 }
 

@@ -22,20 +22,75 @@ extern "C" {
         float focalLength;
     };
 
-    // RAW 开发参数结构（C API 版本）
-    // 注意：这是 C API 的简化版本，用于跨语言互操作
-    // C++ 内部使用 RAWProcessor.h 中的完整版本（包含 enableDemosaicing 等字段）
-    struct RAWDevelopParams {
-        float whiteBalance[4];  // R, G1, B, G2 multipliers
-        float exposure;          // EV adjustment (-5.0 to +5.0)
-        float contrast;          // Contrast adjustment (-100 to +100)
-        float saturation;       // Saturation multiplier (0.0 to 2.0)
-        float highlights;       // Highlights recovery (-100 to +100)
-        float shadows;         // Shadows lift (-100 to +100)
-        float temperature;      // Color temperature in Kelvin (2000 to 50000)
-        float tint;            // Tint adjustment (-150 to +150)
-        // 注意：C++ 版本还有 enableDemosaicing 和 demosaicAlgorithm 字段
-        // 这些字段在 C API 中暂不暴露，使用默认值
+    // 图像调整参数结构（通用，适用于 RAW 和标准图片）
+    // 参考 Adobe Lightroom 的调整面板
+    struct ImageAdjustParams {
+        // 基本调整
+        float exposure;          // 曝光度 (-5.0 to +5.0 EV)
+        float contrast;          // 对比度 (-100 to +100)
+        float highlights;        // 高光 (-100 to +100)
+        float shadows;          // 阴影 (-100 to +100)
+        float whites;            // 白色色阶 (-100 to +100)
+        float blacks;            // 黑色色阶 (-100 to +100)
+        
+        // 白平衡（仅对 RAW 有效，标准图片会被忽略）
+        float temperature;       // 色温 (2000 to 50000 Kelvin)
+        float tint;             // 色调 (-150 to +150)
+        
+        // 颜色调整
+        float vibrance;         // 自然饱和度 (-100 to +100)
+        float saturation;       // 饱和度 (-100 to +100)
+        
+        // HSL 调整（按颜色通道）
+        // 色相 (-100 to +100)
+        float hueRed;
+        float hueOrange;
+        float hueYellow;
+        float hueGreen;
+        float hueAqua;
+        float hueBlue;
+        float huePurple;
+        float hueMagenta;
+        
+        // 饱和度 (-100 to +100)
+        float satRed;
+        float satOrange;
+        float satYellow;
+        float satGreen;
+        float satAqua;
+        float satBlue;
+        float satPurple;
+        float satMagenta;
+        
+        // 明亮度 (-100 to +100)
+        float lumRed;
+        float lumOrange;
+        float lumYellow;
+        float lumGreen;
+        float lumAqua;
+        float lumBlue;
+        float lumPurple;
+        float lumMagenta;
+        
+        // 细节调整
+        float sharpness;        // 锐化 (0 to 150)
+        float noiseReduction;   // 降噪 (0 to 100)
+        
+        // 镜头校正
+        float lensDistortion;   // 镜头畸变 (-100 to +100)
+        float chromaticAberration; // 色差校正 (0 to 100)
+        
+        // 效果
+        float vignette;         // 晕影 (-100 to +100)
+        float grain;            // 颗粒 (0 to 100)
+        
+        // 校准（相机校准）
+        float shadowTint;       // 阴影色调 (-100 to +100)
+        float redHue;           // 红色色相 (-100 to +100)
+        float redSaturation;    // 红色饱和度 (-100 to +100)
+        float greenHue;         // 绿色色相 (-100 to +100)
+        float greenSaturation;  // 绿色饱和度 (-100 to +100)
+        float blueHue;           // 蓝色色相 (-100 to +100)
+        float blueSaturation;    // 蓝色饱和度 (-100 to +100)
     };
 }
-
