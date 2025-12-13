@@ -60,6 +60,16 @@ TestResults/
 *.trx
 *.coverage
 
+# Third-party submodules build outputs
+third_party/**/buildfiles/release-*/
+third_party/**/lib/*.lib
+third_party/**/.vs/
+third_party/**/*.vcxproj.user
+third_party/**/bin/
+third_party/**/object/
+
+
+
 
 
 

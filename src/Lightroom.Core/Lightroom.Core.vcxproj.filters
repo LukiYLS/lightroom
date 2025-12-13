@@ -78,9 +78,6 @@
     <ClCompile Include="ImageProcessing\RAWImageLoader.cpp">
       <Filter>ImageProcessing</Filter>
     </ClCompile>
-    <ClCompile Include="ImageProcessing\RAWProcessor.cpp">
-      <Filter>ImageProcessing</Filter>
-    </ClCompile>
     <ClCompile Include="ImageProcessing\StandardImageLoader.cpp">
       <Filter>ImageProcessing</Filter>
     </ClCompile>
@@ -113,9 +110,6 @@
       <Filter>ImageProcessing</Filter>
     </ClInclude>
     <ClInclude Include="ImageProcessing\RAWImageLoader.h">
-      <Filter>ImageProcessing</Filter>
-    </ClInclude>
-    <ClInclude Include="ImageProcessing\RAWProcessor.h">
       <Filter>ImageProcessing</Filter>
     </ClInclude>
     <ClInclude Include="ImageProcessing\StandardImageLoader.h">

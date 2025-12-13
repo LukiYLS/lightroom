@@ -159,7 +159,6 @@
     <ClInclude Include="ImageProcessing\LibRawWrapper.h" />
     <ClInclude Include="ImageProcessing\RAWImageInfo.h" />
     <ClInclude Include="ImageProcessing\RAWImageLoader.h" />
-    <ClInclude Include="ImageProcessing\RAWProcessor.h" />
     <ClInclude Include="ImageProcessing\StandardImageLoader.h" />
     <ClInclude Include="RenderTargetManager.h" />
     <ClInclude Include="RenderGraph.h" />
@@ -173,7 +172,6 @@
     <ClCompile Include="ImageProcessing\ImageProcessor.cpp" />
     <ClCompile Include="ImageProcessing\LibRawWrapper.cpp" />
     <ClCompile Include="ImageProcessing\RAWImageLoader.cpp" />
-    <ClCompile Include="ImageProcessing\RAWProcessor.cpp" />
     <ClCompile Include="ImageProcessing\StandardImageLoader.cpp" />
     <ClCompile Include="RenderTargetManager.cpp" />
     <ClCompile Include="RenderGraph.cpp" />

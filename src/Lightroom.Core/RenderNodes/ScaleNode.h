@@ -32,22 +32,21 @@ public:
     // 设置输入图片尺寸（用于计算正确的缩放和平移）
     void SetInputImageSize(uint32_t width, uint32_t height);
 
+protected:
+    // 重写基类的钩子方法
+    virtual void UpdateConstantBuffers(uint32_t width, uint32_t height) override;
+    virtual void SetConstantBuffers() override;
+    virtual void SetShaderResources(std::shared_ptr<RenderCore::RHITexture2D> inputTexture) override;
+
 private:
     bool InitializeShaderResources();
     void CleanupShaderResources();
-    void UpdateConstantBuffer(uint32_t outputWidth, uint32_t outputHeight);
 
-    // RHI shader 对象
-    std::shared_ptr<RenderCore::RHIVertexShader> m_VertexShader;
-    std::shared_ptr<RenderCore::RHIPixelShader> m_PixelShader;
-    std::shared_ptr<RenderCore::RHIVertexBuffer> m_VertexBuffer;
-    std::shared_ptr<RenderCore::RHISamplerState> m_SamplerState;
+    // Shader resources（使用基类的 CompiledShader）
+    CompiledShader m_Shader;
+
+    // Constant buffer
     std::shared_ptr<RenderCore::RHIUniformBuffer> m_ConstantBuffer;
-    
-    // D3D11 原生对象（用于直接访问，因为 RHI 接口需要文件路径）
-    Microsoft::WRL::ComPtr<ID3D11VertexShader> m_D3D11VS;
-    Microsoft::WRL::ComPtr<ID3D11PixelShader> m_D3D11PS;
-    Microsoft::WRL::ComPtr<ID3D11InputLayout> m_InputLayout;
     
     // 缩放和平移参数
     double m_ZoomLevel = 1.0;

@@ -14,7 +14,6 @@
 namespace LightroomCore {
 
 // 图像调整节点：通用的图像调整处理（适用于 RAW 和标准图片）
-// 参考 Adobe Lightroom 的调整功能
 class ImageAdjustNode : public RenderNode {
 public:
     ImageAdjustNode(std::shared_ptr<RenderCore::DynamicRHI> rhi);
@@ -32,26 +31,29 @@ public:
     // 获取当前调整参数
     const ImageAdjustParams& GetAdjustParams() const { return m_Params; }
 
+protected:
+    // 重写基类的钩子方法
+    virtual void UpdateConstantBuffers(uint32_t width, uint32_t height) override;
+    virtual void SetConstantBuffers() override;
+    virtual void SetShaderResources(std::shared_ptr<RenderCore::RHITexture2D> inputTexture) override;
+
 private:
     bool InitializeShaderResources();
     void CleanupShaderResources();
-    void UpdateConstantBuffer(uint32_t width, uint32_t height);
 
     ImageAdjustParams m_Params;
 
-    // Shader resources
-    std::shared_ptr<RenderCore::RHIVertexBuffer> m_VertexBuffer;
-    std::shared_ptr<RenderCore::RHISamplerState> m_SamplerState;
-    std::shared_ptr<RenderCore::RHIUniformBuffer> m_ParamsBuffer;
+    // Shader resources（使用基类的 CompiledShader）
+    CompiledShader m_Shader;
 
-    // D3D11 原生对象（用于直接访问）
-    Microsoft::WRL::ComPtr<ID3D11VertexShader> m_D3D11VS;
-    Microsoft::WRL::ComPtr<ID3D11PixelShader> m_D3D11PS;
-    Microsoft::WRL::ComPtr<ID3D11InputLayout> m_InputLayout;
+    // Constant buffer
+    std::shared_ptr<RenderCore::RHIUniformBuffer> m_ParamsBuffer;
 
     bool m_ShaderResourcesInitialized = false;
 };
 
 } // namespace LightroomCore
+
+
 
 

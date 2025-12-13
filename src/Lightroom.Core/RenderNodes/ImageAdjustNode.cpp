@@ -71,12 +71,6 @@ struct __declspec(align(16)) ImageAdjustConstantBuffer {
     float Padding[2];
 };
 
-// 简单的顶点结构
-struct SimpleVertex {
-    float Position[2];
-    float TexCoord[2];
-};
-
 ImageAdjustNode::ImageAdjustNode(std::shared_ptr<RenderCore::DynamicRHI> rhi)
     : RenderNode(rhi)
     , m_ShaderResourcesInitialized(false)
@@ -832,127 +826,34 @@ bool ImageAdjustNode::InitializeShaderResources() {
     std::string psCodeStr = std::string(psCodePart1) + std::string(psCodePart2) + std::string(psCodePart3) + std::string(psCodePart4);
     const char* psCode = psCodeStr.c_str();
 
-    try {
-        // 获取 D3D11 RHI 和设备
-        RenderCore::D3D11DynamicRHI* d3d11RHI = dynamic_cast<RenderCore::D3D11DynamicRHI*>(m_RHI.get());
-        if (!d3d11RHI) {
-            std::cerr << "[ImageAdjustNode] Failed to cast to D3D11DynamicRHI" << std::endl;
-            return false;
-        }
-        
-        ID3D11Device* device = d3d11RHI->GetDevice();
-        if (!device) {
-            std::cerr << "[ImageAdjustNode] Failed to get D3D11 device" << std::endl;
-            return false;
-        }
-
-        // 编译 Vertex Shader
-        Microsoft::WRL::ComPtr<ID3DBlob> vsBlob, psBlob, errorBlob;
-        HRESULT hr = D3DCompile(vsCode, strlen(vsCode), nullptr, nullptr, nullptr, "main", "vs_5_0", 0, 0, &vsBlob, &errorBlob);
-        if (FAILED(hr)) {
-            if (errorBlob) {
-                std::cerr << "[ImageAdjustNode] VS compile error: " << (char*)errorBlob->GetBufferPointer() << std::endl;
-            }
-            return false;
-        }
-
-        // 编译 Pixel Shader
-        hr = D3DCompile(psCode, strlen(psCode), nullptr, nullptr, nullptr, "main", "ps_5_0", 0, 0, &psBlob, &errorBlob);
-        if (FAILED(hr)) {
-            if (errorBlob) {
-                std::cerr << "[ImageAdjustNode] PS compile error: " << (char*)errorBlob->GetBufferPointer() << std::endl;
-            }
-            return false;
-        }
-
-        // 创建 Vertex Shader
-        hr = device->CreateVertexShader(vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), nullptr, &m_D3D11VS);
-        if (FAILED(hr)) {
-            std::cerr << "[ImageAdjustNode] Failed to create VS: 0x" << std::hex << hr << std::endl;
-            return false;
-        }
-
-        // 创建 Pixel Shader
-        hr = device->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, &m_D3D11PS);
-        if (FAILED(hr)) {
-            std::cerr << "[ImageAdjustNode] Failed to create PS: 0x" << std::hex << hr << std::endl;
-            return false;
-        }
-
-        // 创建输入布局
-        D3D11_INPUT_ELEMENT_DESC layout[] = {
-            { "POSITION", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-            { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 8, D3D11_INPUT_PER_VERTEX_DATA, 0 }
-        };
-        hr = device->CreateInputLayout(layout, 2, vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), &m_InputLayout);
-        if (FAILED(hr)) {
-            std::cerr << "[ImageAdjustNode] Failed to create input layout: 0x" << std::hex << hr << std::endl;
-            return false;
-        }
-
-        // 创建全屏四边形顶点缓冲区
-        SimpleVertex vertices[4] = {
-            { -1.0f,  1.0f, 0.0f, 0.0f },  // 左上
-            {  1.0f,  1.0f, 1.0f, 0.0f },  // 右上
-            { -1.0f, -1.0f, 0.0f, 1.0f },  // 左下
-            {  1.0f, -1.0f, 1.0f, 1.0f }   // 右下
-        };
-
-        m_VertexBuffer = m_RHI->RHICreateVertexBuffer(
-            vertices,
-            RenderCore::EBufferUsageFlags::BUF_Static,
-            sizeof(SimpleVertex),
-            4
-        );
-
-        // 创建采样器状态
-        RenderCore::SamplerStateInitializerRHI samplerInit(
-            RenderCore::SF_Bilinear,
-            RenderCore::AM_Clamp,
-            RenderCore::AM_Clamp,
-            RenderCore::AM_Clamp,
-            0.0f,
-            0,
-            0.0f,
-            FLT_MAX,
-            0,
-            RenderCore::SCF_Never
-        );
-        m_SamplerState = m_RHI->RHICreateSamplerState(samplerInit);
-        
-        if (!m_SamplerState) {
-            std::cerr << "[ImageAdjustNode] Failed to create sampler state" << std::endl;
-        }
-
-        // 创建 constant buffer
-        const uint32_t cbSize = sizeof(ImageAdjustConstantBuffer);
-        m_ParamsBuffer = m_RHI->RHICreateUniformBuffer(cbSize);
-        if (!m_ParamsBuffer) {
-            std::cerr << "[ImageAdjustNode] Failed to create constant buffer" << std::endl;
-        }
-
-        m_ShaderResourcesInitialized = (m_VertexBuffer != nullptr && 
-                                        m_SamplerState != nullptr && 
-                                        m_ParamsBuffer != nullptr &&
-                                        m_D3D11VS != nullptr && 
-                                        m_D3D11PS != nullptr && 
-                                        m_InputLayout != nullptr);
+    // 使用基类的 CompileShaders 方法
+    if (!CompileShaders(vsCode, psCode, m_Shader)) {
+        std::cerr << "[ImageAdjustNode] Failed to compile shaders" << std::endl;
+        return false;
     }
-    catch (const std::exception& e) {
-        std::cerr << "[ImageAdjustNode] Failed to initialize shader resources: " << e.what() << std::endl;
-        m_ShaderResourcesInitialized = false;
+
+    // 创建 constant buffer
+    const uint32_t cbSize = sizeof(ImageAdjustConstantBuffer);
+    m_ParamsBuffer = m_RHI->RHICreateUniformBuffer(cbSize);
+    if (!m_ParamsBuffer) {
+        std::cerr << "[ImageAdjustNode] Failed to create constant buffer" << std::endl;
+        return false;
     }
+
+    m_ShaderResourcesInitialized = (m_ParamsBuffer != nullptr &&
+                                    m_Shader.VS != nullptr && 
+                                    m_Shader.PS != nullptr && 
+                                    m_Shader.InputLayout != nullptr);
 
     return m_ShaderResourcesInitialized;
 }
 
 void ImageAdjustNode::CleanupShaderResources() {
-    m_VertexBuffer.reset();
-    m_SamplerState.reset();
     m_ParamsBuffer.reset();
-    m_D3D11VS.Reset();
-    m_D3D11PS.Reset();
-    m_InputLayout.Reset();
+    m_Shader.VS.Reset();
+    m_Shader.PS.Reset();
+    m_Shader.InputLayout.Reset();
+    m_Shader.Blob.Reset();
     m_ShaderResourcesInitialized = false;
 }
 
@@ -960,7 +861,7 @@ void ImageAdjustNode::SetAdjustParams(const ImageAdjustParams& params) {
     m_Params = params;
 }
 
-void ImageAdjustNode::UpdateConstantBuffer(uint32_t width, uint32_t height) {
+void ImageAdjustNode::UpdateConstantBuffers(uint32_t width, uint32_t height) {
     if (!m_ParamsBuffer || !m_CommandContext) {
         return;
     }
@@ -1029,77 +930,36 @@ void ImageAdjustNode::UpdateConstantBuffer(uint32_t width, uint32_t height) {
     m_CommandContext->RHIUpdateUniformBuffer(m_ParamsBuffer, &cbData);
 }
 
+void ImageAdjustNode::SetConstantBuffers() {
+    if (m_ParamsBuffer) {
+        m_CommandContext->RHISetShaderUniformBuffer(RenderCore::EShaderFrequency::SF_Pixel, 0, m_ParamsBuffer);
+    }
+}
+
+void ImageAdjustNode::SetShaderResources(std::shared_ptr<RenderCore::RHITexture2D> inputTexture) {
+    // 设置输入纹理
+    m_CommandContext->RHISetShaderTexture(RenderCore::EShaderFrequency::SF_Pixel, 0, inputTexture);
+    // 设置采样器（使用基类的公共采样器）
+    m_CommandContext->RHISetShaderSampler(RenderCore::EShaderFrequency::SF_Pixel, 0, m_CommonSamplerState);
+}
+
 bool ImageAdjustNode::Execute(std::shared_ptr<RenderCore::RHITexture2D> inputTexture,
                             std::shared_ptr<RenderCore::RHITexture2D> outputTarget,
                             uint32_t width, uint32_t height) {
-    if (!m_CommandContext || !inputTexture || !outputTarget || !m_ShaderResourcesInitialized) {
+    if (!m_ShaderResourcesInitialized) {
         return false;
     }
 
-    if (!m_D3D11VS || !m_D3D11PS || !m_InputLayout || !m_VertexBuffer || !m_SamplerState || !m_ParamsBuffer) {
+    if (!m_Shader.VS || !m_Shader.PS || !m_Shader.InputLayout || !m_ParamsBuffer) {
         std::cerr << "[ImageAdjustNode] Shader resources not properly initialized" << std::endl;
         return false;
     }
 
-    // 获取 D3D11 命令上下文
-    RenderCore::D3D11DynamicRHI* d3d11RHI = dynamic_cast<RenderCore::D3D11DynamicRHI*>(m_RHI.get());
-    if (!d3d11RHI) {
-        return false;
-    }
-    
-    ID3D11DeviceContext* d3d11Context = d3d11RHI->GetDeviceContext();
-    if (!d3d11Context) {
-        return false;
-    }
+    // 设置当前 shader（基类 Execute 会使用）
+    m_CurrentShader = &m_Shader;
 
-    // 1. 更新 constant buffer
-    UpdateConstantBuffer(width, height);
-
-    // 2. 设置渲染目标
-    m_CommandContext->SetRenderTarget(outputTarget, nullptr);
-
-    // 3. 设置视口
-    m_CommandContext->SetViewPort(0, 0, width, height);
-
-    // 4. 清除渲染目标
-    m_CommandContext->Clear(outputTarget, nullptr, core::FLinearColor(0, 0, 0, 1));
-
-    // 5. 设置 constant buffer 到 Pixel Shader
-    if (m_ParamsBuffer) {
-        m_CommandContext->RHISetShaderUniformBuffer(RenderCore::EShaderFrequency::SF_Pixel, 0, m_ParamsBuffer);
-    }
-
-    // 6. 设置 Vertex Shader
-    d3d11Context->VSSetShader(m_D3D11VS.Get(), nullptr, 0);
-
-    // 7. 设置 Pixel Shader
-    d3d11Context->PSSetShader(m_D3D11PS.Get(), nullptr, 0);
-
-    // 8. 设置输入布局
-    d3d11Context->IASetInputLayout(m_InputLayout.Get());
-
-    // 9. 设置顶点缓冲区
-    RenderCore::D3D11VertexBuffer* d3d11VB = dynamic_cast<RenderCore::D3D11VertexBuffer*>(m_VertexBuffer.get());
-    if (d3d11VB) {
-        ID3D11Buffer* vb = d3d11VB->GetNativeBuffer();
-        if (vb) {
-            UINT stride = sizeof(SimpleVertex);
-            UINT offset = 0;
-            d3d11Context->IASetVertexBuffers(0, 1, &vb, &stride, &offset);
-            d3d11Context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-        }
-    }
-
-    // 10. 设置输入纹理
-    m_CommandContext->RHISetShaderTexture(RenderCore::EShaderFrequency::SF_Pixel, 0, inputTexture);
-
-    // 11. 设置采样器
-    m_CommandContext->RHISetShaderSampler(RenderCore::EShaderFrequency::SF_Pixel, 0, m_SamplerState);
-
-    // 11. 绘制
-    d3d11Context->Draw(4, 0);
-
-    return true;
+    // 使用基类的 Execute 方法（它会调用我们的钩子方法）
+    return RenderNode::Execute(inputTexture, outputTarget, width, height);
 }
 
 } // namespace LightroomCore

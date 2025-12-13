@@ -8,7 +8,6 @@
 #include "RenderNodes/RenderNode.h"
 #include "RenderNodes/ScaleNode.h"
 #include "RenderNodes/ImageAdjustNode.h"
-#include "ImageProcessing/RAWProcessor.h"
 #include <iostream>
 #include <string>
 #include <unordered_map>
