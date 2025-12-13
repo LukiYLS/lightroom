@@ -162,9 +162,9 @@ if exist "$(ProjectDir)..\..\third_party\ffmpeg\bin\*.dll" copy /Y "$(ProjectDir
     <ClInclude Include="ImageProcessing\RAWImageInfo.h" />
     <ClInclude Include="ImageProcessing\RAWImageLoader.h" />
     <ClInclude Include="ImageProcessing\StandardImageLoader.h" />
-    <ClInclude Include="ImageProcessing\VideoLoader.h" />
-    <ClInclude Include="ImageProcessing\FFmpegVideoLoader.h" />
-    <ClInclude Include="ImageProcessing\VideoProcessor.h" />
+    <ClInclude Include="VideoProcessing\VideoLoader.h" />
+    <ClInclude Include="VideoProcessing\FFmpegVideoLoader.h" />
+    <ClInclude Include="VideoProcessing\VideoProcessor.h" />
     <ClInclude Include="RenderTargetManager.h" />
     <ClInclude Include="RenderGraph.h" />
     <ClInclude Include="RenderNodes\RenderNode.h" />
@@ -174,14 +174,14 @@ if exist "$(ProjectDir)..\..\third_party\ffmpeg\bin\*.dll" copy /Y "$(ProjectDir
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="LightroomSDK.cpp" />
-    <ClCompile Include="LightroomSDK_Video.cpp" />
+    <ClCompile Include="VideoProcessing\LightroomSDK_Video.cpp" />
     <ClCompile Include="D3D9Interop.cpp" />
     <ClCompile Include="ImageProcessing\ImageProcessor.cpp" />
     <ClCompile Include="ImageProcessing\LibRawWrapper.cpp" />
     <ClCompile Include="ImageProcessing\RAWImageLoader.cpp" />
     <ClCompile Include="ImageProcessing\StandardImageLoader.cpp" />
-    <ClCompile Include="ImageProcessing\FFmpegVideoLoader.cpp" />
-    <ClCompile Include="ImageProcessing\VideoProcessor.cpp" />
+    <ClCompile Include="VideoProcessing\FFmpegVideoLoader.cpp" />
+    <ClCompile Include="VideoProcessing\VideoProcessor.cpp" />
     <ClCompile Include="RenderTargetManager.cpp" />
     <ClCompile Include="RenderGraph.cpp" />
     <ClCompile Include="RenderNodes\RenderNode.cpp" />

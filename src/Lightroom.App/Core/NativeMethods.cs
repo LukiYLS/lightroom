@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.InteropServices;
 
 namespace Lightroom.App.Core
@@ -131,6 +131,58 @@ namespace Lightroom.App.Core
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         public static extern void RemoveFilter(IntPtr renderTargetHandle);
+
+        // 视频相关 API
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        public static extern bool OpenVideo(IntPtr renderTargetHandle, string videoPath);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern void CloseVideo(IntPtr renderTargetHandle);
+
+        // 视频格式枚举
+        public enum VideoFormat
+        {
+            Unknown = 0,
+            MP4 = 1,
+            MOV = 2,
+            AVI = 3,
+            MKV = 4
+        }
+
+        // 视频元数据结构
+        [StructLayout(LayoutKind.Sequential)]
+        public struct VideoMetadata
+        {
+            public uint width;
+            public uint height;
+            public double frameRate;        // fps
+            public long totalFrames;        // 总帧数
+            public long duration;           // 时长（微秒）
+            public VideoFormat format;
+            [MarshalAs(UnmanagedType.Bool)]
+            public bool hasAudio;
+        }
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern bool GetVideoMetadata(IntPtr renderTargetHandle, out VideoMetadata outMetadata);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern bool SeekVideo(IntPtr renderTargetHandle, long timestamp);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern bool SeekVideoToFrame(IntPtr renderTargetHandle, long frameIndex);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern bool RenderVideoFrame(IntPtr renderTargetHandle);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern long GetCurrentVideoFrame(IntPtr renderTargetHandle);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern long GetCurrentVideoTimestamp(IntPtr renderTargetHandle);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        public static extern bool IsVideoFormat(string filePath);
     }
 }
 

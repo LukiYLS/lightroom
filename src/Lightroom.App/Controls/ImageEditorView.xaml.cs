@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
@@ -18,6 +18,8 @@ namespace Lightroom.App.Controls
         private System.Windows.Interop.D3DImage? _d3dImage = null;
         private double _zoomLevel = 1.0;
         private string? _currentImagePath = null;
+        private bool _isVideo = false;
+        private bool _isPlaying = false;
         private uint[] _histogramData = new uint[256 * 4]; // R, G, B, Luminance (每个 256 bins)
         private bool _isInitializing = false;
         private bool _isResizing = false;
@@ -25,19 +27,19 @@ namespace Lightroom.App.Controls
         public event EventHandler<double>? ZoomChanged;
         
         /// <summary>
-        /// 加载图片到编辑视图
+        /// 加载图片或视频到编辑视图
         /// </summary>
         public bool LoadImage(string imagePath)
         {
             if (_renderTargetHandle == IntPtr.Zero)
             {
-                System.Diagnostics.Debug.WriteLine("[ImageEditorView] Cannot load image: render target not initialized");
+                System.Diagnostics.Debug.WriteLine("[ImageEditorView] Cannot load file: render target not initialized");
                 return false;
             }
             
             if (string.IsNullOrEmpty(imagePath))
             {
-                System.Diagnostics.Debug.WriteLine("[ImageEditorView] Image path is null or empty");
+                System.Diagnostics.Debug.WriteLine("[ImageEditorView] File path is null or empty");
                 return false;
             }
             
@@ -50,30 +52,89 @@ namespace Lightroom.App.Controls
             
             // 转换为绝对路径
             string absolutePath = System.IO.Path.GetFullPath(imagePath);
-            System.Diagnostics.Debug.WriteLine($"[ImageEditorView] Loading image: {absolutePath}");
+            
+            // 检查是否为视频文件
+            bool isVideo = NativeMethods.IsVideoFormat(absolutePath);
             
             try
             {
-                bool success = NativeMethods.LoadImageToTarget(_renderTargetHandle, absolutePath);
-                if (success)
+                bool success = false;
+                if (isVideo)
                 {
-                    _currentImagePath = absolutePath;
-                    System.Diagnostics.Debug.WriteLine($"[ImageEditorView] Successfully loaded image: {absolutePath}");
+                    // 加载视频
+                    System.Diagnostics.Debug.WriteLine($"[ImageEditorView] Loading video: {absolutePath}");
                     
-                    // 延迟更新直方图，等待渲染完成
-                    Dispatcher.BeginInvoke(new Action(() => {
-                        UpdateHistogram();
-                    }), DispatcherPriority.Loaded);
+                    // 如果之前是图片，先清理
+                    if (!_isVideo && _currentImagePath != null)
+                    {
+                        // 图片不需要特殊清理，RenderToTarget 会自动处理
+                    }
+                    
+                    success = NativeMethods.OpenVideo(_renderTargetHandle, absolutePath);
+                    if (success)
+                    {
+                        _currentImagePath = absolutePath;
+                        _isVideo = true;
+                        _isPlaying = true; // 自动开始播放
+                        System.Diagnostics.Debug.WriteLine($"[ImageEditorView] Successfully loaded video: {absolutePath}");
+                        
+                        // 立即渲染第一帧（使用 RenderVideoFrame 来解码并渲染第一帧）
+                        bool frameRendered = NativeMethods.RenderVideoFrame(_renderTargetHandle);
+                        if (!frameRendered)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[ImageEditorView] Failed to render first video frame, trying RenderToTarget");
+                            // 如果 RenderVideoFrame 失败，尝试使用 RenderToTarget
+                            NativeMethods.RenderToTarget(_renderTargetHandle);
+                        }
+                        
+                        // 延迟更新直方图，等待渲染完成
+                        Dispatcher.BeginInvoke(new Action(() => {
+                            UpdateHistogram();
+                        }), DispatcherPriority.Loaded);
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[ImageEditorView] Failed to load video: {absolutePath}");
+                        System.Windows.MessageBox.Show(
+                            $"无法加载视频文件：{absolutePath}\n\n可能的原因：\n1. FFmpeg DLL 文件缺失\n2. 视频文件格式不支持\n3. 视频文件已损坏",
+                            "视频加载失败",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Error);
+                    }
                 }
                 else
                 {
-                    System.Diagnostics.Debug.WriteLine($"[ImageEditorView] Failed to load image: {absolutePath}");
+                    // 加载图片
+                    System.Diagnostics.Debug.WriteLine($"[ImageEditorView] Loading image: {absolutePath}");
+                    // 如果之前是视频，先关闭
+                    if (_isVideo)
+                    {
+                        NativeMethods.CloseVideo(_renderTargetHandle);
+                        _isVideo = false;
+                        _isPlaying = false;
+                    }
+                    
+                    success = NativeMethods.LoadImageToTarget(_renderTargetHandle, absolutePath);
+                    if (success)
+                    {
+                        _currentImagePath = absolutePath;
+                        System.Diagnostics.Debug.WriteLine($"[ImageEditorView] Successfully loaded image: {absolutePath}");
+                        
+                        // 延迟更新直方图，等待渲染完成
+                        Dispatcher.BeginInvoke(new Action(() => {
+                            UpdateHistogram();
+                        }), DispatcherPriority.Loaded);
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[ImageEditorView] Failed to load image: {absolutePath}");
+                    }
                 }
                 return success;
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[ImageEditorView] Exception loading image: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[ImageEditorView] Exception loading file: {ex.Message}");
                 System.Diagnostics.Debug.WriteLine($"[ImageEditorView] Stack trace: {ex.StackTrace}");
                 return false;
             }
@@ -178,8 +239,16 @@ namespace Lightroom.App.Controls
             {
                 _renderCount++;
                 
-                // 渲染到目标（如果已加载图片则显示图片，否则显示黑色）
-                NativeMethods.RenderToTarget(_renderTargetHandle);
+                // 如果是视频且正在播放，渲染下一帧
+                if (_isVideo && _isPlaying)
+                {
+                    NativeMethods.RenderVideoFrame(_renderTargetHandle);
+                }
+                else
+                {
+                    // 渲染到目标（如果已加载图片则显示图片，否则显示黑色）
+                    NativeMethods.RenderToTarget(_renderTargetHandle);
+                }
 
                 // 更新 D3DImage
                 if (_d3dImage != null)
@@ -213,6 +282,14 @@ namespace Lightroom.App.Controls
 
         private void CleanupD3DRendering()
         {
+            // 停止播放并关闭视频
+            if (_isVideo && _renderTargetHandle != IntPtr.Zero)
+            {
+                _isPlaying = false;
+                NativeMethods.CloseVideo(_renderTargetHandle);
+                _isVideo = false;
+            }
+
             if (_renderTimer != null)
             {
                 _renderTimer.Stop();
@@ -297,6 +374,8 @@ namespace Lightroom.App.Controls
                 // 保存当前状态
                 string? savedImagePath = _currentImagePath;
                 double savedZoomLevel = _zoomLevel;
+                bool savedIsVideo = _isVideo;
+                bool savedIsPlaying = _isPlaying;
 
                 // 调用 SDK 更新渲染目标尺寸
                 NativeMethods.ResizeRenderTarget(_renderTargetHandle, newWidth, newHeight);
@@ -318,12 +397,19 @@ namespace Lightroom.App.Controls
                     }
                 }
 
-                // 如果之前有加载图片，需要重新加载
+                // 如果之前有加载文件，需要重新加载
                 if (!string.IsNullOrEmpty(savedImagePath))
                 {
-                    // 延迟重新加载图片，等待 resize 完成
+                    // 延迟重新加载文件，等待 resize 完成
                     Dispatcher.BeginInvoke(new Action(() => {
                         LoadImage(savedImagePath);
+                        
+                        // 恢复视频播放状态
+                        if (savedIsVideo)
+                        {
+                            _isVideo = savedIsVideo;
+                            _isPlaying = savedIsPlaying;
+                        }
                         
                         // 恢复缩放级别
                         if (savedZoomLevel != _zoomLevel)

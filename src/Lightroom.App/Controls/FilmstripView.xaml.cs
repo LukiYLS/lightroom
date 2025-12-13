@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -16,12 +16,26 @@ namespace Lightroom.App.Controls
         private List<ThumbnailItem>? _thumbnailItems;
 
         // 支持的图片格式
-        private static readonly string[] SupportedExtensions = { 
+        private static readonly string[] SupportedImageExtensions = { 
             ".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif", ".gif",  // 标准格式
             ".raw", ".cr2", ".cr3", ".nef", ".nrw", ".arw", ".srf",    // Canon, Nikon, Sony
             ".dng", ".orf", ".raf", ".rw2", ".pef", ".ptx",            // Adobe, Olympus, Fujifilm, Panasonic, Pentax
             ".x3f", ".3fr", ".fff", ".mef", ".mos"                     // Sigma, Hasselblad, Mamiya, Leaf
         };
+
+        // 支持的视频格式
+        private static readonly string[] SupportedVideoExtensions = {
+            ".mp4", ".mov", ".avi", ".mkv", ".m4v"  // 视频格式
+        };
+
+        // 所有支持的文件格式（图片 + 视频）
+        private static readonly string[] SupportedExtensions;
+
+        static FilmstripView()
+        {
+            // 初始化所有支持的文件格式
+            SupportedExtensions = SupportedImageExtensions.Concat(SupportedVideoExtensions).ToArray();
+        }
 
         public FilmstripView()
         {

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Windows;
@@ -117,15 +117,15 @@ namespace Lightroom.App
 
             System.Diagnostics.Debug.WriteLine($"Folder selected: {folderPath}");
             
-            // 加载文件夹中的图片到缩略图列表
+            // 加载文件夹中的图片和视频到缩略图列表
             FilmstripViewControl.LoadImagesFromFolder(folderPath);
             
-            // 更新图片数量
+            // 更新文件数量（图片 + 视频）
             if (FilmstripViewControl.ThumbnailPaths != null)
             {
                 LeftPanelControl.UpdateImageCount(FilmstripViewControl.ThumbnailPaths.Count);
                 
-                // 如果有图片，加载第一张
+                // 如果有文件，加载第一个（图片或视频）
                 if (FilmstripViewControl.ThumbnailPaths.Count > 0)
                 {
                     ImageEditorViewControl.LoadImage(FilmstripViewControl.ThumbnailPaths[0]);
@@ -168,6 +168,10 @@ namespace Lightroom.App
                 
                 // 设置调整参数并重新渲染
                 NativeMethods.SetImageAdjustParams(renderHandle, ref adjustParams);
+                
+                // 对于视频，需要重新渲染当前帧以应用调整参数
+                // RenderToTarget 会自动处理图片和视频的情况
+                // 对于视频，它会渲染当前帧（不推进到下一帧），并且会应用最新的调整参数
                 NativeMethods.RenderToTarget(renderHandle);
             }
         }
@@ -263,13 +267,23 @@ namespace Lightroom.App
         // FilmstripView Events
         private void FilmstripView_ThumbnailSelected(object? sender, int index)
         {
-            // 加载选中的图片
+            // 加载选中的图片或视频
             var filmstrip = sender as FilmstripView;
             if (filmstrip != null && filmstrip.ThumbnailPaths != null && index >= 0 && index < filmstrip.ThumbnailPaths.Count)
             {
-                string imagePath = filmstrip.ThumbnailPaths[index];
-                ImageEditorViewControl.LoadImage(imagePath);
-                System.Diagnostics.Debug.WriteLine($"Loading image: {imagePath}");
+                string filePath = filmstrip.ThumbnailPaths[index];
+                ImageEditorViewControl.LoadImage(filePath);
+                
+                // 检查是否为视频文件
+                bool isVideo = NativeMethods.IsVideoFormat(filePath);
+                if (isVideo)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Loading video: {filePath}");
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"Loading image: {filePath}");
+                }
             }
         }
 

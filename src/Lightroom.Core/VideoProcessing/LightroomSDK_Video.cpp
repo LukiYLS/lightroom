@@ -1,14 +1,15 @@
 ﻿// 视频相关 API 实现
 // 此文件包含视频功能的 SDK API 实现
 
-#include "LightroomSDK.h"
-#include "LightroomSDKTypes.h"
-#include "LightroomSDK_Internal.h"
-#include "ImageProcessing/VideoProcessor.h"
-#include "RenderTargetManager.h"
-#include "RenderGraph.h"
-#include "RenderNodes/ImageAdjustNode.h"
-#include "RenderNodes/ScaleNode.h"
+#include "../LightroomSDK.h"
+#include "../LightroomSDKTypes.h"
+#include "../LightroomSDK_Internal.h"
+#include "../D3D9Interop.h"
+#include "VideoProcessor.h"
+#include "../RenderTargetManager.h"
+#include "../RenderGraph.h"
+#include "../RenderNodes/ImageAdjustNode.h"
+#include "../RenderNodes/ScaleNode.h"
 #include <iostream>
 #include <string>
 #include <algorithm>
@@ -25,6 +26,7 @@ using namespace RenderCore;
 extern std::shared_ptr<RenderCore::DynamicRHI> g_DynamicRHI;
 extern LightroomCore::RenderTargetManager* g_RenderTargetManager;
 extern std::unordered_map<void*, std::unique_ptr<RenderTargetData>> g_RenderTargetData;
+extern LightroomCore::D3D9Interop* g_D3D9InteropPtr;
 
 bool OpenVideo(void* renderTargetHandle, const char* videoPath) {
     if (!renderTargetHandle || !videoPath || !g_DynamicRHI) {
@@ -264,6 +266,17 @@ bool RenderVideoFrame(void* renderTargetHandle) {
         auto commandContext = g_DynamicRHI->GetDefaultCommandContext();
         if (commandContext) {
             commandContext->FlushCommands();
+        }
+        
+        // 使用 GPU 拷贝从 D3D11 共享纹理拷贝到 D3D9 表面（与 RenderToTarget 中的逻辑一致）
+        // 注意：renderTargetInfo 已经在上面定义过了，直接使用
+        if (renderTargetInfo && renderTargetInfo->D3D9SharedSurface && renderTargetInfo->D3D9Surface && g_D3D9InteropPtr) {
+            g_D3D9InteropPtr->CopySurface(
+                renderTargetInfo->D3D9SharedSurface,
+                renderTargetInfo->D3D9Surface,
+                renderTargetInfo->Width,
+                renderTargetInfo->Height
+            );
         }
         
         return true;

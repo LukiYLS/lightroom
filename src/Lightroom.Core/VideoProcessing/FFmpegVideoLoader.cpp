@@ -148,6 +148,11 @@ bool FFmpegVideoLoader::Open(const std::wstring& filePath) {
         return false;
     }
     
+    // 设置 RGB 帧的格式和尺寸
+    m_RGBFrame->format = AV_PIX_FMT_RGB24;
+    m_RGBFrame->width = m_CodecContext->width;
+    m_RGBFrame->height = m_CodecContext->height;
+    
     // 计算 RGB 帧所需的缓冲区大小
     int numBytes = av_image_get_buffer_size(AV_PIX_FMT_RGB24, m_CodecContext->width, m_CodecContext->height, 1);
     if (numBytes < 0) {
@@ -325,10 +330,52 @@ std::shared_ptr<RenderCore::RHITexture2D> FFmpegVideoLoader::ReadNextFrame(
         return nullptr;
     }
     
+    // 检查解码后的帧是否有效
+    if (!m_Frame || m_Frame->width <= 0 || m_Frame->height <= 0) {
+        std::cerr << "[FFmpegVideoLoader] Decoded frame has invalid dimensions: " 
+                  << (m_Frame ? m_Frame->width : 0) << "x" 
+                  << (m_Frame ? m_Frame->height : 0) << std::endl;
+        return nullptr;
+    }
+    
     // 转换颜色空间
     sws_scale(m_SwsContext,
               m_Frame->data, m_Frame->linesize, 0, m_CodecContext->height,
               m_RGBFrame->data, m_RGBFrame->linesize);
+    
+    // 确保 RGB 帧的尺寸与解码帧一致（可能在解码过程中改变）
+    if (m_RGBFrame->width != m_Frame->width || m_RGBFrame->height != m_Frame->height) {
+        // 重新分配 RGB 帧缓冲区
+        m_RGBFrame->width = m_Frame->width;
+        m_RGBFrame->height = m_Frame->height;
+        m_RGBFrame->format = AV_PIX_FMT_RGB24;
+        
+        int numBytes = av_image_get_buffer_size(AV_PIX_FMT_RGB24, m_Frame->width, m_Frame->height, 1);
+        if (numBytes > 0) {
+            m_RGBBuffer.resize(numBytes);
+            av_image_fill_arrays(m_RGBFrame->data, m_RGBFrame->linesize, m_RGBBuffer.data(), 
+                                AV_PIX_FMT_RGB24, m_Frame->width, m_Frame->height, 1);
+            
+            // 重新创建 SwsContext
+            if (m_SwsContext) {
+                sws_freeContext(m_SwsContext);
+            }
+            m_SwsContext = sws_getContext(
+                m_Frame->width, m_Frame->height, m_CodecContext->pix_fmt,
+                m_Frame->width, m_Frame->height, AV_PIX_FMT_RGB24,
+                SWS_BILINEAR, nullptr, nullptr, nullptr);
+            
+            if (!m_SwsContext) {
+                std::cerr << "[FFmpegVideoLoader] Failed to recreate SwsContext" << std::endl;
+                return nullptr;
+            }
+            
+            // 重新转换
+            sws_scale(m_SwsContext,
+                      m_Frame->data, m_Frame->linesize, 0, m_Frame->height,
+                      m_RGBFrame->data, m_RGBFrame->linesize);
+        }
+    }
     
     // 转换为纹理
     auto texture = ConvertFrameToTexture(m_RGBFrame, rhi);
@@ -354,15 +401,33 @@ std::shared_ptr<RenderCore::RHITexture2D> FFmpegVideoLoader::ConvertFrameToTextu
     AVFrame* frame,
     std::shared_ptr<RenderCore::DynamicRHI> rhi) {
     if (!frame || !rhi) {
+        std::cerr << "[FFmpegVideoLoader] ConvertFrameToTexture: Invalid parameters" << std::endl;
         return nullptr;
     }
     
-    // 将 RGB24 转换为 BGRA8（D3D11 格式）
-    uint32_t width = frame->width;
-    uint32_t height = frame->height;
-    uint32_t stride = width * 4; // BGRA = 4 bytes
+    // 检查帧尺寸 - 使用 codec context 的尺寸作为后备
+    uint32_t width = static_cast<uint32_t>(frame->width > 0 ? frame->width : m_CodecContext->width);
+    uint32_t height = static_cast<uint32_t>(frame->height > 0 ? frame->height : m_CodecContext->height);
     
-    std::vector<uint8_t> bgraData(width * height * 4);
+    if (width == 0 || height == 0) {
+        std::cerr << "[FFmpegVideoLoader] ConvertFrameToTexture: Invalid frame dimensions: " 
+                  << "frame->width=" << frame->width << ", frame->height=" << frame->height
+                  << ", codec->width=" << m_CodecContext->width << ", codec->height=" << m_CodecContext->height << std::endl;
+        return nullptr;
+    }
+    
+    // 检查数据指针
+    if (!frame->data[0]) {
+        std::cerr << "[FFmpegVideoLoader] ConvertFrameToTexture: Frame data is null" << std::endl;
+        return nullptr;
+    }
+    
+    // D3D11 要求 pitch 必须是 4 字节对齐的
+    // 计算对齐后的 stride（每行字节数，必须是 4 的倍数）
+    uint32_t stride = (width * 4 + 3) & ~3; // 向上对齐到 4 字节边界
+    uint32_t dataSize = stride * height;
+    
+    std::vector<uint8_t> bgraData(dataSize, 0); // 初始化为 0，确保对齐部分为 0
     
     // 转换 RGB24 到 BGRA8
     for (uint32_t y = 0; y < height; y++) {
@@ -375,18 +440,27 @@ std::shared_ptr<RenderCore::RHITexture2D> FFmpegVideoLoader::ConvertFrameToTextu
             bgraLine[x * 4 + 2] = rgbLine[x * 3 + 0]; // R
             bgraLine[x * 4 + 3] = 255;                // A
         }
+        // 对齐部分已经初始化为 0，不需要额外处理
     }
     
     // 创建纹理
     auto texture = rhi->RHICreateTexture2D(
         RenderCore::EPixelFormat::PF_B8G8R8A8,
         RenderCore::ETextureCreateFlags::TexCreate_ShaderResource,
-        width,
-        height,
-        1,
+        static_cast<int32_t>(width),
+        static_cast<int32_t>(height),
+        1,  // NumMips
         bgraData.data(),
-        stride
+        static_cast<int>(stride)
     );
+    
+    if (!texture) {
+        std::cerr << "[FFmpegVideoLoader] ConvertFrameToTexture: Failed to create texture (" 
+                  << width << "x" << height << ", stride=" << stride << ")" << std::endl;
+    } else {
+        std::cout << "[FFmpegVideoLoader] ConvertFrameToTexture: Successfully created texture (" 
+                  << width << "x" << height << ", stride=" << stride << ")" << std::endl;
+    }
     
     return texture;
 }

@@ -10,7 +10,7 @@
 #include "RenderNodes/ScaleNode.h"
 #include "RenderNodes/ImageAdjustNode.h"
 #include "RenderNodes/FilterNode.h"
-#include "ImageProcessing/VideoProcessor.h"
+#include "VideoProcessing/VideoProcessor.h"
 #include <iostream>
 #include <string>
 #include <unordered_map>
@@ -38,8 +38,11 @@ using namespace LightroomCore;
 std::shared_ptr<RenderCore::DynamicRHI> g_DynamicRHI = nullptr;
 std::unordered_map<void*, std::unique_ptr<RenderTargetData>> g_RenderTargetData;
 
-// 其他全局状态（仅在此文件中使用）
-static std::unique_ptr<D3D9Interop> g_D3D9Interop = nullptr;
+// 其他全局状态
+// 注意：g_D3D9Interop 需要被 LightroomSDK_Video.cpp 访问，所以不能是 static
+std::unique_ptr<LightroomCore::D3D9Interop> g_D3D9Interop = nullptr;
+LightroomCore::D3D9Interop* g_D3D9InteropPtr = nullptr;  // 视频 API 需要访问（指向 g_D3D9Interop）
+
 static std::unique_ptr<ImageProcessor> g_ImageProcessor = nullptr;
 static std::unique_ptr<RenderTargetManager> g_RenderTargetManagerPtr = nullptr;  // 生命周期管理
 LightroomCore::RenderTargetManager* g_RenderTargetManager = nullptr;  // 视频 API 需要访问（指向 g_RenderTargetManagerPtr）
@@ -64,7 +67,8 @@ bool InitSDK() {
         g_DynamicRHI->Init();
         
         // 2. 初始化 D3D9 互操作
-        g_D3D9Interop = std::make_unique<D3D9Interop>();
+        g_D3D9Interop = std::make_unique<LightroomCore::D3D9Interop>();
+        g_D3D9InteropPtr = g_D3D9Interop.get();  // 设置指针供视频 API 使用
         if (!g_D3D9Interop->Initialize()) {
             std::cerr << "[SDK] Failed to initialize D3D9 interop" << std::endl;
             return false;
@@ -89,6 +93,7 @@ bool InitSDK() {
 
 void ShutdownSDK() {
     std::cout << "[SDK] Shutting down..." << std::endl;
+    g_D3D9InteropPtr = nullptr;  // 清除指针
     
     // 清理所有渲染目标数据
     g_RenderTargetData.clear();
@@ -257,14 +262,20 @@ void RenderToTarget(void* renderTargetHandle) {
         // 如果是视频，使用视频渲染逻辑
         if (data->bIsVideo && data->VideoProcessor) {
             // 获取当前帧（不推进到下一帧，只是渲染当前帧）
+            // 如果还没有帧，尝试获取第一帧
             auto frameTexture = data->VideoProcessor->GetCurrentFrame();
+            if (!frameTexture) {
+                // 如果当前帧不存在，尝试获取下一帧（这会解码第一帧）
+                frameTexture = data->VideoProcessor->GetNextFrame();
+            }
+            
             if (frameTexture) {
                 data->ImageTexture = frameTexture;
                 
                 // 获取输出纹理
                 auto outputTexture = g_RenderTargetManager->GetRHITexture(renderTargetHandle);
                 if (outputTexture && data->RenderGraph) {
-                    // 执行渲染图
+                    // 执行渲染图（这会应用所有调整参数）
                     if (data->RenderGraph->Execute(
                             frameTexture,
                             outputTexture,
@@ -275,10 +286,23 @@ void RenderToTarget(void* renderTargetHandle) {
                         if (commandContext) {
                             commandContext->FlushCommands();
                         }
+                        
+                        // 确保 D3D11 命令已提交到 GPU
+                        RenderCore::D3D11DynamicRHI* d3d11RHI = dynamic_cast<RenderCore::D3D11DynamicRHI*>(g_DynamicRHI.get());
+                        if (d3d11RHI) {
+                            ID3D11DeviceContext* d3d11Context = d3d11RHI->GetDeviceContext();
+                            if (d3d11Context) {
+                                d3d11Context->Flush();
+                            }
+                        }
                     }
                 }
+            } else {
+                std::cerr << "[SDK] RenderToTarget: Failed to get video frame" << std::endl;
             }
-            return;
+            
+            // 视频渲染后也需要复制到 D3D9 表面（与图片渲染逻辑一致）
+            // 注意：不要 return，继续执行后面的 D3D9 表面复制逻辑
         }
         
         // 如果有图片，执行渲染图
@@ -344,8 +368,8 @@ void RenderToTarget(void* renderTargetHandle) {
         }
         
         // 使用 GPU 拷贝从 D3D11 共享纹理拷贝到 D3D9 表面
-        if (renderTargetInfo->D3D9SharedSurface && renderTargetInfo->D3D9Surface) {
-            g_D3D9Interop->CopySurface(
+        if (renderTargetInfo->D3D9SharedSurface && renderTargetInfo->D3D9Surface && g_D3D9InteropPtr) {
+            g_D3D9InteropPtr->CopySurface(
                 renderTargetInfo->D3D9SharedSurface,
                 renderTargetInfo->D3D9Surface,
                 renderTargetInfo->Width,

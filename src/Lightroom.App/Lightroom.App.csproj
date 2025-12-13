@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -20,6 +20,7 @@
       <NativeDllPath>..\..\bin\$(Configuration)\LightroomCore.dll</NativeDllPath>
       <NativePdbPath>..\..\bin\$(Configuration)\LightroomCore.pdb</NativePdbPath>
       <LibRawDllPath>..\..\third_party\libraw\buildfiles\release-x86_64\libraw.dll</LibRawDllPath>
+      <FFmpegBinPath>..\..\third_party\ffmpeg\bin</FFmpegBinPath>
       <LutsSourcePath>..\..\resources\luts</LutsSourcePath>
       <LutsTargetPath>$(OutDir)resources\luts</LutsTargetPath>
     </PropertyGroup>
@@ -28,6 +29,11 @@
     <Copy SourceFiles="$(NativePdbPath)" DestinationFolder="$(OutDir)" Condition="Exists('$(NativePdbPath)')" ContinueOnError="true" />
     <Message Text="Copying libraw.dll from $(LibRawDllPath) to $(OutDir)" Importance="high" />
     <Copy SourceFiles="$(LibRawDllPath)" DestinationFolder="$(OutDir)" Condition="Exists('$(LibRawDllPath)')" ContinueOnError="true" />
+    <Message Text="Copying FFmpeg DLLs from $(FFmpegBinPath) to $(OutDir)" Importance="high" />
+    <ItemGroup>
+      <FFmpegDlls Include="$(FFmpegBinPath)\*.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(FFmpegDlls)" DestinationFolder="$(OutDir)" Condition="Exists('$(FFmpegBinPath)')" ContinueOnError="true" />
     <Message Text="Copying LUT filters from $(LutsSourcePath) to $(LutsTargetPath)" Importance="high" />
     <ItemGroup>
       <LutFiles Include="$(LutsSourcePath)\*.cube" />

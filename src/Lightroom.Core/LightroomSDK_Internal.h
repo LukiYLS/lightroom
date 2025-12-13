@@ -8,7 +8,7 @@
 #include "RenderGraph.h"
 #include "ImageProcessing/ImageLoader.h"
 #include "ImageProcessing/RAWImageInfo.h"
-#include "ImageProcessing/VideoProcessor.h"
+#include "VideoProcessing/VideoProcessor.h"
 #include <memory>
 #include <unordered_map>
 
@@ -46,4 +46,10 @@ namespace LightroomCore {
 extern std::shared_ptr<RenderCore::DynamicRHI> g_DynamicRHI;
 extern LightroomCore::RenderTargetManager* g_RenderTargetManager;
 extern std::unordered_map<void*, std::unique_ptr<RenderTargetData>> g_RenderTargetData;
+
+// D3D9 互操作前向声明（在 LightroomCore 命名空间中）
+namespace LightroomCore {
+    class D3D9Interop;
+}
+extern LightroomCore::D3D9Interop* g_D3D9InteropPtr;
 
