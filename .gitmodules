@@ -1,3 +1,6 @@
 [submodule "third_party/libraw"]
 	path = third_party/libraw
 	url = https://github.com/LibRaw/LibRaw.git
+[submodule "src/Lightroom.App/third_party/ffmpeg"]
+	path = src/Lightroom.App/third_party/ffmpeg
+	url = https://github.com/FFmpeg/FFmpeg.git

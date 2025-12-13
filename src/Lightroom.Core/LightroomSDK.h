@@ -80,5 +80,46 @@ extern "C" {
     
     // 移除滤镜（从渲染图中移除 FilterNode）
     LIGHTROOM_API void RemoveFilter(void* renderTargetHandle);
+    
+    // 视频相关 API
+    // 打开视频文件到渲染目标
+    // videoPath: 视频文件路径（UTF-8 编码）
+    // 返回是否成功
+    LIGHTROOM_API bool OpenVideo(void* renderTargetHandle, const char* videoPath);
+    
+    // 关闭视频
+    LIGHTROOM_API void CloseVideo(void* renderTargetHandle);
+    
+    // 获取视频元数据
+    // outMetadata: 输出元数据结构（定义在 LightroomSDKTypes.h 中）
+    // 返回是否成功
+    LIGHTROOM_API bool GetVideoMetadata(void* renderTargetHandle, struct VideoMetadata* outMetadata);
+    
+    // 视频定位
+    // timestamp: 时间戳（微秒）
+    // 返回是否成功
+    LIGHTROOM_API bool SeekVideo(void* renderTargetHandle, int64_t timestamp);
+    
+    // 视频定位到指定帧
+    // frameIndex: 帧索引（从 0 开始）
+    // 返回是否成功
+    LIGHTROOM_API bool SeekVideoToFrame(void* renderTargetHandle, int64_t frameIndex);
+    
+    // 读取并渲染视频帧（用于播放循环）
+    // 返回是否成功
+    LIGHTROOM_API bool RenderVideoFrame(void* renderTargetHandle);
+    
+    // 获取当前视频帧索引
+    // 返回当前帧索引，如果未打开视频则返回 -1
+    LIGHTROOM_API int64_t GetCurrentVideoFrame(void* renderTargetHandle);
+    
+    // 获取当前视频时间戳（微秒）
+    // 返回当前时间戳，如果未打开视频则返回 -1
+    LIGHTROOM_API int64_t GetCurrentVideoTimestamp(void* renderTargetHandle);
+    
+    // 检查文件是否为视频格式
+    // filePath: 文件路径（UTF-8 编码）
+    // 返回是否为视频格式
+    LIGHTROOM_API bool IsVideoFormat(const char* filePath);
 }
 

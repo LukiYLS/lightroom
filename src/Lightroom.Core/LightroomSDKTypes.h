@@ -93,4 +93,24 @@ extern "C" {
         float blueHue;           // 蓝色色相 (-100 to +100)
         float blueSaturation;    // 蓝色饱和度 (-100 to +100)
     };
+
+    // 视频格式枚举（C 兼容）
+    enum VideoFormat {
+        VideoFormat_Unknown = 0,
+        VideoFormat_MP4 = 1,
+        VideoFormat_MOV = 2,
+        VideoFormat_AVI = 3,
+        VideoFormat_MKV = 4
+    };
+
+    // 视频元数据结构
+    struct VideoMetadata {
+        uint32_t width;
+        uint32_t height;
+        double frameRate;        // fps
+        int64_t totalFrames;      // 总帧数
+        int64_t duration;         // 时长（微秒）
+        VideoFormat format;
+        bool hasAudio;
+    };
 }

@@ -1,0 +1,335 @@
+﻿// 视频相关 API 实现
+// 此文件包含视频功能的 SDK API 实现
+
+#include "LightroomSDK.h"
+#include "LightroomSDKTypes.h"
+#include "LightroomSDK_Internal.h"
+#include "ImageProcessing/VideoProcessor.h"
+#include "RenderTargetManager.h"
+#include "RenderGraph.h"
+#include "RenderNodes/ImageAdjustNode.h"
+#include "RenderNodes/ScaleNode.h"
+#include <iostream>
+#include <string>
+#include <algorithm>
+
+using namespace RenderCore;
+// 不完全使用 LightroomCore 命名空间，避免与 C API 类型冲突
+// using namespace LightroomCore;
+
+// 使用 C API 的类型（避免与 C++ 命名空间冲突）
+// 注意：VideoMetadata 和 VideoFormat 在 C API (LightroomSDKTypes.h) 和 C++ 命名空间 (LightroomCore) 中都有定义
+// 在函数参数中使用 struct VideoMetadata 来明确使用 C API 的类型
+
+// 外部全局变量（在 LightroomSDK.cpp 中定义）
+extern std::shared_ptr<RenderCore::DynamicRHI> g_DynamicRHI;
+extern LightroomCore::RenderTargetManager* g_RenderTargetManager;
+extern std::unordered_map<void*, std::unique_ptr<RenderTargetData>> g_RenderTargetData;
+
+bool OpenVideo(void* renderTargetHandle, const char* videoPath) {
+    if (!renderTargetHandle || !videoPath || !g_DynamicRHI) {
+        std::cerr << "[SDK] Invalid parameters for OpenVideo" << std::endl;
+        return false;
+    }
+    
+    auto it = g_RenderTargetData.find(renderTargetHandle);
+    if (it == g_RenderTargetData.end()) {
+        std::cerr << "[SDK] Invalid render target handle" << std::endl;
+        return false;
+    }
+    
+    auto& data = it->second;
+    if (!data) {
+        return false;
+    }
+    
+    try {
+        // 关闭之前的视频（如果有）
+        if (data->VideoProcessor) {
+            data->VideoProcessor->CloseVideo();
+        }
+        
+        // 创建新的视频处理器
+        data->VideoProcessor = std::make_unique<LightroomCore::VideoProcessor>(g_DynamicRHI);
+        
+        // 转换路径
+        int pathLen = MultiByteToWideChar(CP_UTF8, 0, videoPath, -1, nullptr, 0);
+        if (pathLen <= 0) {
+            std::cerr << "[SDK] Failed to convert video path to wide string" << std::endl;
+            return false;
+        }
+        
+        std::wstring wVideoPath(pathLen - 1, L'\0');
+        MultiByteToWideChar(CP_UTF8, 0, videoPath, -1, &wVideoPath[0], pathLen);
+        
+        // 打开视频
+        if (!data->VideoProcessor->OpenVideo(wVideoPath)) {
+            std::cerr << "[SDK] Failed to open video: " << videoPath << std::endl;
+            data->VideoProcessor.reset();
+            return false;
+        }
+        
+        // 获取视频元数据并设置渲染图
+        const LightroomCore::VideoMetadata* metadata = data->VideoProcessor->GetMetadata();
+        if (!metadata) {
+            std::cerr << "[SDK] Failed to get video metadata" << std::endl;
+            data->VideoProcessor->CloseVideo();
+            data->VideoProcessor.reset();
+            return false;
+        }
+        
+        // 清除旧的渲染图
+        data->RenderGraph->Clear();
+        
+        // 添加图像调整节点
+        auto adjustNode = std::make_shared<LightroomCore::ImageAdjustNode>(g_DynamicRHI);
+        ImageAdjustParams defaultParams;
+        memset(&defaultParams, 0, sizeof(ImageAdjustParams));
+        defaultParams.temperature = 5500.0f;
+        adjustNode->SetAdjustParams(defaultParams);
+        data->RenderGraph->AddNode(adjustNode);
+        
+        // 添加缩放节点
+        auto scaleNode = std::make_shared<LightroomCore::ScaleNode>(g_DynamicRHI);
+        scaleNode->SetInputImageSize(metadata->width, metadata->height);
+        data->RenderGraph->AddNode(scaleNode);
+        
+        data->bIsVideo = true;
+        data->bHasImage = true;
+        data->ImageFormat = LightroomCore::ImageFormat::Unknown; // 视频不使用 ImageFormat
+        
+        std::cout << "[SDK] Video opened: " << metadata->width << "x" << metadata->height 
+                  << ", " << metadata->frameRate << " fps, " << metadata->totalFrames << " frames" << std::endl;
+        
+        return true;
+    }
+    catch (const std::exception& e) {
+        std::cerr << "[SDK] Exception opening video: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+void CloseVideo(void* renderTargetHandle) {
+    if (!renderTargetHandle) {
+        return;
+    }
+    
+    auto it = g_RenderTargetData.find(renderTargetHandle);
+    if (it == g_RenderTargetData.end()) {
+        return;
+    }
+    
+    auto& data = it->second;
+    if (data && data->VideoProcessor) {
+        data->VideoProcessor->CloseVideo();
+        data->VideoProcessor.reset();
+        data->bIsVideo = false;
+        data->bHasImage = false;
+        std::cout << "[SDK] Video closed" << std::endl;
+    }
+}
+
+bool GetVideoMetadata(void* renderTargetHandle, VideoMetadata* outMetadata) {
+    if (!renderTargetHandle || !outMetadata) {
+        return false;
+    }
+    
+    auto it = g_RenderTargetData.find(renderTargetHandle);
+    if (it == g_RenderTargetData.end()) {
+        return false;
+    }
+    
+    auto& data = it->second;
+    if (!data || !data->VideoProcessor || !data->bIsVideo) {
+        return false;
+    }
+    
+    const LightroomCore::VideoMetadata* cppMetadata = data->VideoProcessor->GetMetadata();
+    if (!cppMetadata) {
+        return false;
+    }
+    
+    // 转换 C++ 枚举到 C 枚举
+    outMetadata->width = cppMetadata->width;
+    outMetadata->height = cppMetadata->height;
+    outMetadata->frameRate = cppMetadata->frameRate;
+    outMetadata->totalFrames = cppMetadata->totalFrames;
+    outMetadata->duration = cppMetadata->duration;
+    outMetadata->hasAudio = cppMetadata->hasAudio;
+    
+    switch (cppMetadata->format) {
+        case LightroomCore::VideoFormat::MP4:
+            outMetadata->format = VideoFormat_MP4;
+            break;
+        case LightroomCore::VideoFormat::MOV:
+            outMetadata->format = VideoFormat_MOV;
+            break;
+        case LightroomCore::VideoFormat::AVI:
+            outMetadata->format = VideoFormat_AVI;
+            break;
+        case LightroomCore::VideoFormat::MKV:
+            outMetadata->format = VideoFormat_MKV;
+            break;
+        default:
+            outMetadata->format = VideoFormat_Unknown;
+            break;
+    }
+    
+    return true;
+}
+
+bool SeekVideo(void* renderTargetHandle, int64_t timestamp) {
+    if (!renderTargetHandle) {
+        return false;
+    }
+    
+    auto it = g_RenderTargetData.find(renderTargetHandle);
+    if (it == g_RenderTargetData.end()) {
+        return false;
+    }
+    
+    auto& data = it->second;
+    if (!data || !data->VideoProcessor || !data->bIsVideo) {
+        return false;
+    }
+    
+    return data->VideoProcessor->Seek(timestamp);
+}
+
+bool SeekVideoToFrame(void* renderTargetHandle, int64_t frameIndex) {
+    if (!renderTargetHandle) {
+        return false;
+    }
+    
+    auto it = g_RenderTargetData.find(renderTargetHandle);
+    if (it == g_RenderTargetData.end()) {
+        return false;
+    }
+    
+    auto& data = it->second;
+    if (!data || !data->VideoProcessor || !data->bIsVideo) {
+        return false;
+    }
+    
+    return data->VideoProcessor->SeekToFrame(frameIndex);
+}
+
+bool RenderVideoFrame(void* renderTargetHandle) {
+    if (!renderTargetHandle || !g_RenderTargetManager) {
+        return false;
+    }
+    
+    auto it = g_RenderTargetData.find(renderTargetHandle);
+    if (it == g_RenderTargetData.end()) {
+        return false;
+    }
+    
+    auto& data = it->second;
+    if (!data || !data->VideoProcessor || !data->bIsVideo || !data->RenderGraph) {
+        return false;
+    }
+    
+    try {
+        // 读取下一帧
+        auto frameTexture = data->VideoProcessor->GetNextFrame();
+        if (!frameTexture) {
+            return false;
+        }
+        
+        // 更新 ImageTexture（用于渲染图）
+        data->ImageTexture = frameTexture;
+        
+        // 获取输出纹理
+        using RenderTargetInfo = LightroomCore::RenderTargetManager::RenderTargetInfo;
+        RenderTargetInfo* renderTargetInfo = g_RenderTargetManager->GetRenderTargetInfo(renderTargetHandle);
+        if (!renderTargetInfo || !renderTargetInfo->RHIRenderTarget) {
+            return false;
+        }
+        
+        std::shared_ptr<RenderCore::RHITexture2D> outputTexture = g_RenderTargetManager->GetRHITexture(renderTargetHandle);
+        if (!outputTexture) {
+            return false;
+        }
+        
+        // 执行渲染图
+        if (!data->RenderGraph->Execute(
+                frameTexture,
+                outputTexture,
+                renderTargetInfo->Width,
+                renderTargetInfo->Height)) {
+            return false;
+        }
+        
+        // 刷新命令
+        auto commandContext = g_DynamicRHI->GetDefaultCommandContext();
+        if (commandContext) {
+            commandContext->FlushCommands();
+        }
+        
+        return true;
+    }
+    catch (const std::exception& e) {
+        std::cerr << "[SDK] Exception rendering video frame: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+int64_t GetCurrentVideoFrame(void* renderTargetHandle) {
+    if (!renderTargetHandle) {
+        return -1;
+    }
+    
+    auto it = g_RenderTargetData.find(renderTargetHandle);
+    if (it == g_RenderTargetData.end()) {
+        return -1;
+    }
+    
+    auto& data = it->second;
+    if (!data || !data->VideoProcessor || !data->bIsVideo) {
+        return -1;
+    }
+    
+    return data->VideoProcessor->GetCurrentFrameIndex();
+}
+
+int64_t GetCurrentVideoTimestamp(void* renderTargetHandle) {
+    if (!renderTargetHandle) {
+        return -1;
+    }
+    
+    auto it = g_RenderTargetData.find(renderTargetHandle);
+    if (it == g_RenderTargetData.end()) {
+        return -1;
+    }
+    
+    auto& data = it->second;
+    if (!data || !data->VideoProcessor || !data->bIsVideo) {
+        return -1;
+    }
+    
+    return data->VideoProcessor->GetCurrentTimestamp();
+}
+
+bool IsVideoFormat(const char* filePath) {
+    if (!filePath) {
+        return false;
+    }
+    
+    // 转换路径
+    int pathLen = MultiByteToWideChar(CP_UTF8, 0, filePath, -1, nullptr, 0);
+    if (pathLen <= 0) {
+        return false;
+    }
+    
+    std::wstring wFilePath(pathLen - 1, L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, filePath, -1, &wFilePath[0], pathLen);
+    
+    // 检查扩展名
+    std::wstring ext = wFilePath.substr(wFilePath.find_last_of(L".") + 1);
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::towlower);
+    
+    return ext == L"mp4" || ext == L"mov" || ext == L"avi" || 
+           ext == L"mkv" || ext == L"m4v" || ext == L"flv" ||
+           ext == L"webm" || ext == L"3gp";
+}
+

@@ -1,4 +1,5 @@
 ﻿#include "LightroomSDK.h"
+#include "LightroomSDK_Internal.h"
 #include "D3D9Interop.h"
 #include "ImageProcessing/ImageProcessor.h"
 #include "ImageProcessing/ImageLoader.h"
@@ -9,6 +10,7 @@
 #include "RenderNodes/ScaleNode.h"
 #include "RenderNodes/ImageAdjustNode.h"
 #include "RenderNodes/FilterNode.h"
+#include "ImageProcessing/VideoProcessor.h"
 #include <iostream>
 #include <string>
 #include <unordered_map>
@@ -31,23 +33,16 @@ using namespace RenderCore;
 using namespace LightroomCore;
 
 // 全局状态
-static std::shared_ptr<DynamicRHI> g_DynamicRHI = nullptr;
+// 注意：g_DynamicRHI 和 g_RenderTargetData 在 LightroomSDK_Internal.h 中声明为 extern
+// 这里定义它们，供 LightroomSDK_Video.cpp 使用
+std::shared_ptr<RenderCore::DynamicRHI> g_DynamicRHI = nullptr;
+std::unordered_map<void*, std::unique_ptr<RenderTargetData>> g_RenderTargetData;
+
+// 其他全局状态（仅在此文件中使用）
 static std::unique_ptr<D3D9Interop> g_D3D9Interop = nullptr;
 static std::unique_ptr<ImageProcessor> g_ImageProcessor = nullptr;
-static std::unique_ptr<RenderTargetManager> g_RenderTargetManager = nullptr;
-
-// 渲染目标关联的渲染图（每个渲染目标可以有独立的渲染图）
-struct RenderTargetData {
-    std::shared_ptr<RHITexture2D> ImageTexture;  // 加载的图片纹理
-    std::unique_ptr<RenderGraph> RenderGraph;     // 渲染图
-    bool bHasImage;
-    LightroomCore::ImageFormat ImageFormat;      // 图片格式（Standard 或 RAW）
-    std::unique_ptr<LightroomCore::RAWImageInfo> RAWInfo;  // RAW 信息（仅在 RAW 格式时有效）
-    
-    RenderTargetData() : bHasImage(false), ImageFormat(LightroomCore::ImageFormat::Unknown) {}
-};
-
-static std::unordered_map<void*, std::unique_ptr<RenderTargetData>> g_RenderTargetData;
+static std::unique_ptr<RenderTargetManager> g_RenderTargetManagerPtr = nullptr;  // 生命周期管理
+LightroomCore::RenderTargetManager* g_RenderTargetManager = nullptr;  // 视频 API 需要访问（指向 g_RenderTargetManagerPtr）
 
 bool InitSDK() {
     try {
@@ -79,7 +74,9 @@ bool InitSDK() {
         g_ImageProcessor = std::make_unique<ImageProcessor>(g_DynamicRHI);
         
         // 4. 创建渲染目标管理器
-        g_RenderTargetManager = std::make_unique<RenderTargetManager>(g_DynamicRHI, g_D3D9Interop.get());
+        g_RenderTargetManagerPtr = std::make_unique<RenderTargetManager>(g_DynamicRHI, g_D3D9Interop.get());
+        g_RenderTargetManager = g_RenderTargetManagerPtr.get();
+        // 注意：renderTargetManager 的生命周期由 g_ImageProcessor 管理，这里只是保存指针
         
         std::cout << "[SDK] SDK Initialized Successfully" << std::endl;
         return true;
@@ -97,7 +94,8 @@ void ShutdownSDK() {
     g_RenderTargetData.clear();
     
     // 清理管理器
-    g_RenderTargetManager.reset();
+    g_RenderTargetManager = nullptr;
+    g_RenderTargetManagerPtr.reset();
     g_ImageProcessor.reset();
     
     // 清理 D3D9 互操作
@@ -253,6 +251,33 @@ void RenderToTarget(void* renderTargetHandle) {
     try {
         auto* renderTargetInfo = g_RenderTargetManager->GetRenderTargetInfo(renderTargetHandle);
         if (!renderTargetInfo || !renderTargetInfo->RHIRenderTarget) {
+            return;
+        }
+        
+        // 如果是视频，使用视频渲染逻辑
+        if (data->bIsVideo && data->VideoProcessor) {
+            // 获取当前帧（不推进到下一帧，只是渲染当前帧）
+            auto frameTexture = data->VideoProcessor->GetCurrentFrame();
+            if (frameTexture) {
+                data->ImageTexture = frameTexture;
+                
+                // 获取输出纹理
+                auto outputTexture = g_RenderTargetManager->GetRHITexture(renderTargetHandle);
+                if (outputTexture && data->RenderGraph) {
+                    // 执行渲染图
+                    if (data->RenderGraph->Execute(
+                            frameTexture,
+                            outputTexture,
+                            renderTargetInfo->Width,
+                            renderTargetInfo->Height)) {
+                        // 刷新命令
+                        auto commandContext = g_DynamicRHI->GetDefaultCommandContext();
+                        if (commandContext) {
+                            commandContext->FlushCommands();
+                        }
+                    }
+                }
+            }
             return;
         }
         
@@ -440,10 +465,19 @@ bool GetRAWMetadata(void* renderTargetHandle, RAWImageMetadata* outMetadata) {
     outMetadata->focalLength = data->RAWInfo->focalLength;
     
     // 复制字符串（确保不溢出）
-    strncpy_s(outMetadata->cameraModel, sizeof(outMetadata->cameraModel), 
-              data->RAWInfo->cameraModel.c_str(), _TRUNCATE);
-    strncpy_s(outMetadata->lensModel, sizeof(outMetadata->lensModel), 
-              data->RAWInfo->lensModel.c_str(), _TRUNCATE);
+    size_t cameraModelLen = data->RAWInfo->cameraModel.length();
+    size_t cameraModelSize = sizeof(outMetadata->cameraModel);
+    size_t cameraModelCopyLen = (cameraModelLen < cameraModelSize - 1) ? cameraModelLen : cameraModelSize - 1;
+    strncpy_s(outMetadata->cameraModel, cameraModelSize, 
+              data->RAWInfo->cameraModel.c_str(), cameraModelCopyLen);
+    outMetadata->cameraModel[cameraModelCopyLen] = '\0';
+    
+    size_t lensModelLen = data->RAWInfo->lensModel.length();
+    size_t lensModelSize = sizeof(outMetadata->lensModel);
+    size_t lensModelCopyLen = (lensModelLen < lensModelSize - 1) ? lensModelLen : lensModelSize - 1;
+    strncpy_s(outMetadata->lensModel, lensModelSize, 
+              data->RAWInfo->lensModel.c_str(), lensModelCopyLen);
+    outMetadata->lensModel[lensModelCopyLen] = '\0';
     
     return true;
 }

@@ -5,8 +5,28 @@ EXPORTS
     CreateRenderTarget
     DestroyRenderTarget
     GetRenderTargetSharedHandle
+    LoadImageToTarget
     RenderToTarget
     ResizeRenderTarget
+    SetRenderTargetZoom
+    IsRAWFormat
+    GetRAWMetadata
+    SetImageAdjustParams
+    ResetImageAdjustParams
+    GetHistogramData
+    LoadFilterLUT
+    LoadFilterLUTFromFile
+    SetFilterIntensity
+    RemoveFilter
+    OpenVideo
+    CloseVideo
+    GetVideoMetadata
+    SeekVideo
+    SeekVideoToFrame
+    RenderVideoFrame
+    GetCurrentVideoFrame
+    GetCurrentVideoTimestamp
+    IsVideoFormat
 
 
 
