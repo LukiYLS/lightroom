@@ -140,7 +140,9 @@
             <!-- Right Panel -->
             <controls:RightPanel x:Name="RightPanelControl" 
                                Grid.Column="4"
-                               AdjustmentChanged="RightPanel_AdjustmentChanged"/>
+                               AdjustmentChanged="RightPanel_AdjustmentChanged"
+                               FilterSelected="RightPanel_FilterSelected"
+                               FilterIntensityChanged="RightPanel_FilterIntensityChanged"/>
         </Grid>
         
         <!-- Bottom Filmstrip -->

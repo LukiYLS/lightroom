@@ -121,6 +121,16 @@ namespace Lightroom.App.Core
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         public static extern bool GetHistogramData(IntPtr renderTargetHandle, [Out] uint[] outHistogram);
+
+        // 滤镜相关 API
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        public static extern bool LoadFilterLUTFromFile(IntPtr renderTargetHandle, string filePath);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern void SetFilterIntensity(IntPtr renderTargetHandle, float intensity);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern void RemoveFilter(IntPtr renderTargetHandle);
     }
 }
 

@@ -99,8 +99,12 @@ bool RenderNode::CompileShaders(const char* vsCode, const char* psCode, Compiled
     HRESULT hr = D3DCompile(vsCode, strlen(vsCode), nullptr, nullptr, nullptr, "main", "vs_5_0", 0, 0, 
                            &outShader.Blob, &errorBlob);
     if (FAILED(hr)) {
+        std::cerr << "[RenderNode] VS compile failed with HRESULT: 0x" << std::hex << hr << std::dec << std::endl;
         if (errorBlob) {
-            std::cerr << "[RenderNode] VS compile error: " << (char*)errorBlob->GetBufferPointer() << std::endl;
+            const char* errorMsg = (char*)errorBlob->GetBufferPointer();
+            std::cerr << "[RenderNode] VS compile error:\n" << errorMsg << std::endl;
+        } else {
+            std::cerr << "[RenderNode] No error blob available" << std::endl;
         }
         return false;
     }
@@ -115,11 +119,16 @@ bool RenderNode::CompileShaders(const char* vsCode, const char* psCode, Compiled
 
     // 编译 Pixel Shader
     Microsoft::WRL::ComPtr<ID3DBlob> psBlob;
+    errorBlob.Reset();
     hr = D3DCompile(psCode, strlen(psCode), nullptr, nullptr, nullptr, "main", "ps_5_0", 0, 0, 
                     &psBlob, &errorBlob);
     if (FAILED(hr)) {
+        std::cerr << "[RenderNode] PS compile failed with HRESULT: 0x" << std::hex << hr << std::dec << std::endl;
         if (errorBlob) {
-            std::cerr << "[RenderNode] PS compile error: " << (char*)errorBlob->GetBufferPointer() << std::endl;
+            const char* errorMsg = (char*)errorBlob->GetBufferPointer();
+            std::cerr << "[RenderNode] PS compile error:\n" << errorMsg << std::endl;
+        } else {
+            std::cerr << "[RenderNode] No error blob available" << std::endl;
         }
         return false;
     }

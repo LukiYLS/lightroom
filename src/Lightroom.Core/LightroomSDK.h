@@ -62,5 +62,23 @@ extern "C" {
     // outHistogram: 输出数组，大小为 256 * 4 (R, G, B, Luminance)，每个通道 256 个值
     // 返回是否成功
     LIGHTROOM_API bool GetHistogramData(void* renderTargetHandle, uint32_t* outHistogram);
+    
+    // 滤镜相关 API
+    // 加载 LUT 滤镜到渲染目标
+    // lutSize: LUT 尺寸（例如 32 表示 32x32x32 的 3D LUT）
+    // lutData: LUT 数据，格式为 RGB float 数组，大小为 lutSize^3 * 3，值范围 [0, 1]
+    // 返回是否成功
+    LIGHTROOM_API bool LoadFilterLUT(void* renderTargetHandle, uint32_t lutSize, const float* lutData);
+    
+    // 从 .cube 文件加载滤镜
+    // filePath: .cube 文件路径（UTF-8 编码）
+    // 返回是否成功
+    LIGHTROOM_API bool LoadFilterLUTFromFile(void* renderTargetHandle, const char* filePath);
+    
+    // 设置滤镜强度（0.0 = 无效果，1.0 = 完全应用）
+    LIGHTROOM_API void SetFilterIntensity(void* renderTargetHandle, float intensity);
+    
+    // 移除滤镜（从渲染图中移除 FilterNode）
+    LIGHTROOM_API void RemoveFilter(void* renderTargetHandle);
 }
 

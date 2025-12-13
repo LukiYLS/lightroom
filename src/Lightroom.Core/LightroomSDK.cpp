@@ -8,6 +8,7 @@
 #include "RenderNodes/RenderNode.h"
 #include "RenderNodes/ScaleNode.h"
 #include "RenderNodes/ImageAdjustNode.h"
+#include "RenderNodes/FilterNode.h"
 #include <iostream>
 #include <string>
 #include <unordered_map>
@@ -612,6 +613,200 @@ bool GetHistogramData(void* renderTargetHandle, uint32_t* outHistogram) {
     catch (const std::exception& e) {
         std::cerr << "[SDK] Exception getting histogram: " << e.what() << std::endl;
         return false;
+    }
+}
+
+// 辅助函数：查找渲染图中的 FilterNode
+static std::shared_ptr<FilterNode> FindFilterNode(void* renderTargetHandle) {
+    if (!renderTargetHandle) {
+        return nullptr;
+    }
+    
+    auto it = g_RenderTargetData.find(renderTargetHandle);
+    if (it == g_RenderTargetData.end() || !it->second || !it->second->RenderGraph) {
+        return nullptr;
+    }
+    
+    // 在渲染图中查找 FilterNode
+    for (size_t i = 0; i < it->second->RenderGraph->GetNodeCount(); ++i) {
+        auto node = it->second->RenderGraph->GetNode(i);
+        if (node && strcmp(node->GetName(), "Filter") == 0) {
+            return std::dynamic_pointer_cast<FilterNode>(node);
+        }
+    }
+    
+    return nullptr;
+}
+
+bool LoadFilterLUT(void* renderTargetHandle, uint32_t lutSize, const float* lutData) {
+    if (!renderTargetHandle || !lutData || lutSize == 0 || lutSize > 256) {
+        std::cerr << "[SDK] Invalid parameters for LoadFilterLUT" << std::endl;
+        return false;
+    }
+    
+    auto it = g_RenderTargetData.find(renderTargetHandle);
+    if (it == g_RenderTargetData.end() || !it->second || !it->second->RenderGraph) {
+        std::cerr << "[SDK] Invalid render target handle" << std::endl;
+        return false;
+    }
+    
+    try {
+        auto& data = it->second;
+        auto& renderGraph = data->RenderGraph;
+        
+        // 查找是否已存在 FilterNode
+        std::shared_ptr<FilterNode> filterNode = FindFilterNode(renderTargetHandle);
+        
+        if (!filterNode) {
+            // 创建新的 FilterNode
+            filterNode = std::make_shared<FilterNode>(g_DynamicRHI);
+            
+            // 查找 ImageAdjustNode 的位置，在其后插入 FilterNode
+            // 渲染图顺序：ImageAdjust -> Filter -> Scale
+            size_t insertIndex = 0;
+            for (size_t i = 0; i < renderGraph->GetNodeCount(); ++i) {
+                auto node = renderGraph->GetNode(i);
+                if (node && strcmp(node->GetName(), "ImageAdjust") == 0) {
+                    insertIndex = i + 1;
+                    break;
+                }
+            }
+            
+            // 由于 RenderGraph 没有 InsertNode 方法，我们需要重建渲染图
+            // 或者使用一个更简单的方法：在 ImageAdjust 之后、Scale 之前插入
+            // 暂时先清除并重建（这不是最优方案，但可以工作）
+            // TODO: 优化 RenderGraph 以支持插入节点
+            
+            // 临时方案：保存现有节点，清除，然后重新添加
+            std::vector<std::shared_ptr<RenderNode>> savedNodes;
+            for (size_t i = 0; i < renderGraph->GetNodeCount(); ++i) {
+                savedNodes.push_back(renderGraph->GetNode(i));
+            }
+            
+            renderGraph->Clear();
+            
+            // 重新添加节点，在 ImageAdjust 之后插入 FilterNode
+            for (size_t i = 0; i < savedNodes.size(); ++i) {
+                renderGraph->AddNode(savedNodes[i]);
+                if (savedNodes[i] && strcmp(savedNodes[i]->GetName(), "ImageAdjust") == 0) {
+                    renderGraph->AddNode(filterNode);
+                }
+            }
+        }
+        
+        // 加载 LUT
+        if (!filterNode->LoadLUT(lutSize, lutData)) {
+            std::cerr << "[SDK] Failed to load LUT" << std::endl;
+            return false;
+        }
+        
+        std::cout << "[SDK] Filter LUT loaded successfully: " << lutSize << "x" << lutSize << "x" << lutSize << std::endl;
+        return true;
+    }
+    catch (const std::exception& e) {
+        std::cerr << "[SDK] Exception loading filter LUT: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+bool LoadFilterLUTFromFile(void* renderTargetHandle, const char* filePath) {
+    if (!renderTargetHandle || !filePath) {
+        std::cerr << "[SDK] Invalid parameters for LoadFilterLUTFromFile" << std::endl;
+        return false;
+    }
+    
+    auto it = g_RenderTargetData.find(renderTargetHandle);
+    if (it == g_RenderTargetData.end() || !it->second || !it->second->RenderGraph) {
+        std::cerr << "[SDK] Invalid render target handle" << std::endl;
+        return false;
+    }
+    
+    try {
+        auto& data = it->second;
+        auto& renderGraph = data->RenderGraph;
+        
+        // 查找是否已存在 FilterNode
+        std::shared_ptr<FilterNode> filterNode = FindFilterNode(renderTargetHandle);
+        
+        if (!filterNode) {
+            // 创建新的 FilterNode
+            filterNode = std::make_shared<FilterNode>(g_DynamicRHI);
+            
+            // 保存现有节点，清除，然后重新添加
+            std::vector<std::shared_ptr<RenderNode>> savedNodes;
+            for (size_t i = 0; i < renderGraph->GetNodeCount(); ++i) {
+                savedNodes.push_back(renderGraph->GetNode(i));
+            }
+            
+            renderGraph->Clear();
+            
+            // 重新添加节点，在 ImageAdjust 之后插入 FilterNode
+            for (size_t i = 0; i < savedNodes.size(); ++i) {
+                renderGraph->AddNode(savedNodes[i]);
+                if (savedNodes[i] && strcmp(savedNodes[i]->GetName(), "ImageAdjust") == 0) {
+                    renderGraph->AddNode(filterNode);
+                }
+            }
+        }
+        
+        // 从文件加载 LUT
+        if (!filterNode->LoadLUTFromFile(filePath)) {
+            std::cerr << "[SDK] Failed to load LUT from file: " << filePath << std::endl;
+            return false;
+        }
+        
+        std::cout << "[SDK] Filter LUT loaded from file: " << filePath << std::endl;
+        return true;
+    }
+    catch (const std::exception& e) {
+        std::cerr << "[SDK] Exception loading filter LUT from file: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+void SetFilterIntensity(void* renderTargetHandle, float intensity) {
+    if (!renderTargetHandle) {
+        return;
+    }
+    
+    auto filterNode = FindFilterNode(renderTargetHandle);
+    if (filterNode) {
+        filterNode->SetIntensity(intensity);
+    }
+}
+
+void RemoveFilter(void* renderTargetHandle) {
+    if (!renderTargetHandle) {
+        return;
+    }
+    
+    auto it = g_RenderTargetData.find(renderTargetHandle);
+    if (it == g_RenderTargetData.end() || !it->second || !it->second->RenderGraph) {
+        return;
+    }
+    
+    try {
+        auto& renderGraph = it->second->RenderGraph;
+        
+        // 查找并移除 FilterNode
+        // 由于 RenderGraph 没有 RemoveNode 方法，我们需要重建渲染图
+        std::vector<std::shared_ptr<RenderNode>> savedNodes;
+        for (size_t i = 0; i < renderGraph->GetNodeCount(); ++i) {
+            auto node = renderGraph->GetNode(i);
+            if (node && strcmp(node->GetName(), "Filter") != 0) {
+                savedNodes.push_back(node);
+            }
+        }
+        
+        renderGraph->Clear();
+        for (auto& node : savedNodes) {
+            renderGraph->AddNode(node);
+        }
+        
+        std::cout << "[SDK] Filter removed" << std::endl;
+    }
+    catch (const std::exception& e) {
+        std::cerr << "[SDK] Exception removing filter: " << e.what() << std::endl;
     }
 }
 

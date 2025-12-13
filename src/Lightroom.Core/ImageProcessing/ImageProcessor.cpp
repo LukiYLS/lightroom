@@ -1,5 +1,4 @@
-﻿// 防止 Winsock 冲突 - 必须在包含任何 Windows 头文件之前
-#ifndef WIN32_LEAN_AND_MEAN
+﻿#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
 #ifndef NOMINMAX

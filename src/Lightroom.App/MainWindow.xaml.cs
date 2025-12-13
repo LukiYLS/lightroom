@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Windows;
 using Lightroom.App.Core;
 using Lightroom.App.Controls;
@@ -168,6 +169,87 @@ namespace Lightroom.App
                 // 设置调整参数并重新渲染
                 NativeMethods.SetImageAdjustParams(renderHandle, ref adjustParams);
                 NativeMethods.RenderToTarget(renderHandle);
+            }
+        }
+
+        private void RightPanel_FilterSelected(object? sender, string filterName)
+        {
+            var renderHandle = ImageEditorViewControl.GetRenderTargetHandle();
+            if (renderHandle == IntPtr.Zero)
+            {
+                System.Diagnostics.Debug.WriteLine("[Filter] Render target handle is null");
+                return;
+            }
+
+            try
+            {
+                if (filterName == "无" || string.IsNullOrEmpty(filterName))
+                {
+                    // 移除滤镜
+                    System.Diagnostics.Debug.WriteLine("[Filter] Removing filter");
+                    NativeMethods.RemoveFilter(renderHandle);
+                }
+                else
+                {
+                    // 获取滤镜文件路径
+                    string? filterPath = RightPanelControl.GetSelectedFilterPath();
+                    System.Diagnostics.Debug.WriteLine($"[Filter] Selected filter: {filterName}, Path: {filterPath}");
+                    
+                    if (string.IsNullOrEmpty(filterPath))
+                    {
+                        System.Diagnostics.Debug.WriteLine("[Filter] Filter path is null or empty");
+                        return;
+                    }
+                    
+                    if (!File.Exists(filterPath))
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[Filter] Filter file does not exist: {filterPath}");
+                        return;
+                    }
+                    
+                    // 加载滤镜
+                    System.Diagnostics.Debug.WriteLine($"[Filter] Loading filter from: {filterPath}");
+                    bool success = NativeMethods.LoadFilterLUTFromFile(renderHandle, filterPath);
+                    System.Diagnostics.Debug.WriteLine($"[Filter] LoadFilterLUTFromFile returned: {success}");
+                    
+                    if (success)
+                    {
+                        // 获取当前强度并应用
+                        double intensity = RightPanelControl.GetFilterIntensity();
+                        System.Diagnostics.Debug.WriteLine($"[Filter] Setting intensity: {intensity}");
+                        NativeMethods.SetFilterIntensity(renderHandle, (float)intensity);
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine("[Filter] Failed to load filter LUT");
+                    }
+                }
+
+                // 重新渲染
+                System.Diagnostics.Debug.WriteLine("[Filter] Rendering to target");
+                NativeMethods.RenderToTarget(renderHandle);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Filter] Error applying filter: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[Filter] Stack trace: {ex.StackTrace}");
+            }
+        }
+
+        private void RightPanel_FilterIntensityChanged(object? sender, double intensity)
+        {
+            var renderHandle = ImageEditorViewControl.GetRenderTargetHandle();
+            if (renderHandle != IntPtr.Zero)
+            {
+                try
+                {
+                    NativeMethods.SetFilterIntensity(renderHandle, (float)intensity);
+                    NativeMethods.RenderToTarget(renderHandle);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error setting filter intensity: {ex.Message}");
+                }
             }
         }
 
