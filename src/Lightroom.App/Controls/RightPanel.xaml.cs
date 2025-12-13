@@ -103,5 +103,10 @@ namespace Lightroom.App.Controls
             VignetteSlider.Value = 0;
             GrainSlider.Value = 0;
         }
+
+        private void ResetButton_Click(object sender, RoutedEventArgs e)
+        {
+            ResetAll();
+        }
     }
 }

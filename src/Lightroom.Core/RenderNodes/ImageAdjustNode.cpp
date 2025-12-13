@@ -7,6 +7,7 @@
 #include <d3dcompiler.h>
 #include <iostream>
 #include <cstring>
+#include <string>
 #include <algorithm>
 
 #pragma comment(lib, "d3dcompiler.lib")
@@ -118,7 +119,8 @@ bool ImageAdjustNode::InitializeShaderResources() {
 
     // 图像调整像素 shader（基础框架 - 等待逐个实现算法）
     // TODO: 逐个添加算法实现，方便调试
-    const char* psCode = R"(
+    // 将 shader 代码拆分成多个部分以避免字符串过长错误
+    const char* psCodePart1 = R"(
         cbuffer AdjustParams : register(b0) {
             // 基本调整
             float Exposure;
@@ -186,7 +188,9 @@ bool ImageAdjustNode::InitializeShaderResources() {
         // ============================================
         // 算法实现区域 - 逐个添加算法函数
         // ============================================
-        
+    )";
+    
+    const char* psCodePart2 = R"(
         // 常量定义：1/3，用于色相计算中的120度角度转换
         #define ONE_THIRD 0.3333333
         
@@ -196,10 +200,186 @@ bool ImageAdjustNode::InitializeShaderResources() {
             return color * pow(2.0, ev);
         }
         
-        // 对比度调整
-        float3 AdjustContrast(float3 color, float c) {
-            // 简单的对比度调整
-            return (color - 0.5) * (1.0 + c / 50.0) + 0.5;
+        // Photoshop 标准对比度调整算法
+        // contrast: 对比度值，范围 -1 到 1（已在 C++ 端归一化）
+        // 使用 Photoshop 的标准公式：factor = (259 * (contrast + 255)) / (255 * (259 - contrast))
+        float3 AdjustContrast(float3 color, float contrast) {
+            // contrast 已经是归一化的值（-1 到 1），需要映射到 [-255, 255]
+            float c = contrast * 255.0;
+            
+            // 避免除零错误
+            if (abs(c - 259.0) < 0.1) {
+                c = 258.9;
+            }
+            
+            // Photoshop 对比度公式
+            float factor = (259.0 * (c + 255.0)) / (255.0 * (259.0 - c));
+            
+            // 应用对比度调整（以 0.5 为中点）
+            float3 result;
+            result.r = saturate(factor * (color.r - 0.5) + 0.5);
+            result.g = saturate(factor * (color.g - 0.5) + 0.5);
+            result.b = saturate(factor * (color.b - 0.5) + 0.5);
+            
+            return result;
+        }
+        
+        // Photoshop 高光调整算法
+        // highlights: 高光调整值，范围 -100 到 100（负值恢复高光，正值增强高光）
+        // 基于亮度的非线性调整，使用 S 曲线
+        float3 AdjustHighlights(float3 color, float highlights) {
+            if (abs(highlights) < 0.1) {
+                return color;
+            }
+            
+            // 计算亮度（使用标准权重）
+            float luminance = dot(color, float3(0.299, 0.587, 0.114));
+            
+            // 高光区域：亮度 > 0.4（降低阈值，让更多区域受影响）
+            if (luminance <= 0.4) {
+                return color; // 非高光区域不调整
+            }
+            
+            // 计算高光区域的权重（0.4-1.0 映射到 0.0-1.0）
+            float highlightWeight = (luminance - 0.4) / 0.6;
+            
+            // 使用平滑的 S 曲线函数，增强效果
+            float curve = smoothstep(0.0, 1.0, highlightWeight);
+            
+            // 高光调整：负值恢复（降低），正值增强（提高）
+            float adjustAmount = highlights / 100.0;
+            
+            // 应用调整：增强调整强度
+            float3 adjustedColor;
+            if (adjustAmount < 0.0) {
+                // 恢复高光：降低亮度，恢复细节（增强效果）
+                float reduceFactor = 1.0 + adjustAmount * curve * 1.5;
+                adjustedColor = color * saturate(reduceFactor);
+            } else {
+                // 增强高光：提高亮度（增强效果）
+                float boostFactor = 1.0 + adjustAmount * curve * 0.8;
+                adjustedColor = lerp(color, color * boostFactor, curve);
+            }
+            
+            return saturate(adjustedColor);
+        }
+        
+        // Photoshop 阴影调整算法
+        // shadows: 阴影调整值，范围 -100 到 100（正值提升阴影，负值降低阴影）
+        // 基于亮度的非线性调整，使用反向 S 曲线
+        float3 AdjustShadows(float3 color, float shadows) {
+            if (abs(shadows) < 0.1) {
+                return color;
+            }
+            
+            // 计算亮度（使用标准权重）
+            float luminance = dot(color, float3(0.299, 0.587, 0.114));
+            
+            // 阴影区域：亮度 < 0.6（提高阈值，让更多区域受影响）
+            if (luminance >= 0.6) {
+                return color; // 非阴影区域不调整
+            }
+            
+            // 计算阴影区域的权重（0.0-0.6 映射到 1.0-0.0）
+            float shadowWeight = (0.6 - luminance) / 0.6;
+            
+            // 使用平滑的 S 曲线函数，增强效果
+            float curve = smoothstep(0.0, 1.0, shadowWeight);
+            
+            // 阴影调整：正值提升（提亮），负值降低（变暗）
+            float adjustAmount = shadows / 100.0;
+            
+            // 应用调整：增强调整强度
+            float3 adjustedColor;
+            if (adjustAmount > 0.0) {
+                // 提升阴影：增加亮度，恢复细节（增强效果）
+                float liftFactor = 1.0 + adjustAmount * curve * 1.5;
+                adjustedColor = lerp(color, color * liftFactor, curve);
+            } else {
+                // 降低阴影：减少亮度（增强效果）
+                float reduceFactor = 1.0 + adjustAmount * curve * 1.2;
+                adjustedColor = color * saturate(reduceFactor);
+            }
+            
+            return saturate(adjustedColor);
+        }
+        
+        // Photoshop 白色色阶调整算法
+        // whites: 白色色阶调整值，范围 -100 到 100（正值提高白色点，负值降低白色点）
+        float3 AdjustWhites(float3 color, float whites) {
+            if (abs(whites) < 0.1) {
+                return color;
+            }
+            
+            // 计算亮度
+            float luminance = dot(color, float3(0.299, 0.587, 0.114));
+            
+            // 只影响高光区域（亮度 > 0.7）
+            if (luminance <= 0.7) {
+                return color;
+            }
+            
+            // 计算高光区域的权重（0.7-1.0 映射到 0.0-1.0）
+            float whiteWeight = (luminance - 0.7) / 0.3;
+            
+            // 使用平滑曲线
+            float curve = whiteWeight * whiteWeight;
+            
+            // 白色色阶调整
+            float adjustAmount = whites / 100.0;
+            
+            // 应用调整
+            float3 adjustedColor;
+            if (adjustAmount > 0.0) {
+                // 提高白色点：增强高光
+                float boostFactor = 1.0 + adjustAmount * curve * 0.3; // 限制增强幅度
+                adjustedColor = lerp(color, color * boostFactor, curve);
+            } else {
+                // 降低白色点：压缩高光
+                float reduceFactor = 1.0 + adjustAmount * curve * 0.5;
+                adjustedColor = color * reduceFactor;
+            }
+            
+            return saturate(adjustedColor);
+        }
+        
+        // Photoshop 黑色色阶调整算法
+        // blacks: 黑色色阶调整值，范围 -100 到 100（正值提高黑色点，负值降低黑色点）
+        float3 AdjustBlacks(float3 color, float blacks) {
+            if (abs(blacks) < 0.1) {
+                return color;
+            }
+            
+            // 计算亮度
+            float luminance = dot(color, float3(0.299, 0.587, 0.114));
+            
+            // 只影响阴影区域（亮度 < 0.3）
+            if (luminance >= 0.3) {
+                return color;
+            }
+            
+            // 计算阴影区域的权重（0.0-0.3 映射到 1.0-0.0）
+            float blackWeight = (0.3 - luminance) / 0.3;
+            
+            // 使用平滑曲线
+            float curve = blackWeight * blackWeight;
+            
+            // 黑色色阶调整
+            float adjustAmount = blacks / 100.0;
+            
+            // 应用调整
+            float3 adjustedColor;
+            if (adjustAmount > 0.0) {
+                // 提高黑色点：提升阴影
+                float liftFactor = 1.0 + adjustAmount * curve * 0.5;
+                adjustedColor = lerp(color, color * liftFactor, curve);
+            } else {
+                // 降低黑色点：加深阴影
+                float reduceFactor = 1.0 + adjustAmount * curve;
+                adjustedColor = color * reduceFactor;
+            }
+            
+            return saturate(adjustedColor);
         }
         
         // RGB到HSL色彩空间转换
@@ -432,7 +612,9 @@ bool ImageAdjustNode::InitializeShaderResources() {
 
             return result;
         }
-        
+    )";
+    
+    const char* psCodePart3 = R"(
         // ============================================
         // 主函数 - 逐个添加算法调用
         // ============================================
@@ -457,9 +639,23 @@ bool ImageAdjustNode::InitializeShaderResources() {
             }
             
             // 3. 高光/阴影/白色/黑色调整 (Highlights, Shadows, Whites, Blacks)
-            // TODO: 等待算法实现...
+            // 注意：调整顺序很重要，先调整高光/阴影，再调整白色/黑色色阶
+            if (abs(Highlights) > 0.1) {
+                rgb = AdjustHighlights(rgb, Highlights);
+            }
+            if (abs(Shadows) > 0.1) {
+                rgb = AdjustShadows(rgb, Shadows);
+            }
+            if (abs(Whites) > 0.1) {
+                rgb = AdjustWhites(rgb, Whites);
+            }
+            if (abs(Blacks) > 0.1) {
+                rgb = AdjustBlacks(rgb, Blacks);
+            }
             
             // 4. 对比度调整 (Contrast)
+            // 对比度调整应该在色调调整之后进行
+            // 注意：Contrast 已经在 C++ 端归一化到 -1 到 1
             if (abs(Contrast) > 0.001) {
                 rgb = AdjustContrast(rgb, Contrast);
             }
@@ -498,6 +694,10 @@ bool ImageAdjustNode::InitializeShaderResources() {
             return float4(rgb, color.a);
         }
     )";
+    
+    // 连接所有 shader 代码部分
+    std::string psCodeStr = std::string(psCodePart1) + std::string(psCodePart2) + std::string(psCodePart3);
+    const char* psCode = psCodeStr.c_str();
 
     try {
         // 获取 D3D11 RHI 和设备
