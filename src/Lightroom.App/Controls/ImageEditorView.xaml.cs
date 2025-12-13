@@ -3,6 +3,9 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Threading;
+using System.Windows.Media;
+using System.Windows.Shapes;
+using System.Windows.Media.Imaging;
 using Lightroom.App.Core;
 
 namespace Lightroom.App.Controls
@@ -15,6 +18,7 @@ namespace Lightroom.App.Controls
         private System.Windows.Interop.D3DImage? _d3dImage = null;
         private double _zoomLevel = 1.0;
         private string? _currentImagePath = null;
+        private uint[] _histogramData = new uint[256 * 4]; // R, G, B, Luminance (每个 256 bins)
 
         public event EventHandler<double>? ZoomChanged;
         
@@ -53,6 +57,11 @@ namespace Lightroom.App.Controls
                 {
                     _currentImagePath = absolutePath;
                     System.Diagnostics.Debug.WriteLine($"[ImageEditorView] Successfully loaded image: {absolutePath}");
+                    
+                    // 延迟更新直方图，等待渲染完成
+                    Dispatcher.BeginInvoke(new Action(() => {
+                        UpdateHistogram();
+                    }), DispatcherPriority.Loaded);
                 }
                 else
                 {
@@ -180,6 +189,12 @@ namespace Lightroom.App.Controls
                         _d3dImage.Unlock();
                     }
                 }
+
+                // 每 10 帧更新一次直方图（降低性能开销）
+                if (_renderCount % 10 == 0)
+                {
+                    UpdateHistogram();
+                }
             }
             catch (Exception ex)
             {
@@ -248,6 +263,152 @@ namespace Lightroom.App.Controls
         public IntPtr GetRenderTargetHandle()
         {
             return _renderTargetHandle;
+        }
+
+        private void UpdateHistogram()
+        {
+            if (HistogramCanvas == null || _renderTargetHandle == IntPtr.Zero)
+                return;
+
+            // 从 SDK 获取真实的直方图数据
+            if (_currentImagePath == null)
+            {
+                // 没有图片时，显示空直方图
+                HistogramCanvas.Children.Clear();
+                return;
+            }
+
+            // 从 SDK 获取直方图数据
+            bool success = NativeMethods.GetHistogramData(_renderTargetHandle, _histogramData);
+            if (!success)
+            {
+                // 如果获取失败，清空直方图
+                HistogramCanvas.Children.Clear();
+                return;
+            }
+
+            // 绘制直方图
+            DrawHistogram();
+        }
+
+        private void DrawHistogram()
+        {
+            if (HistogramCanvas == null)
+                return;
+
+            HistogramCanvas.Children.Clear();
+
+            // 等待布局完成
+            if (HistogramCanvas.ActualWidth <= 0 || HistogramCanvas.ActualHeight <= 0)
+            {
+                // 如果布局未完成，延迟重试
+                Dispatcher.BeginInvoke(new Action(() => {
+                    DrawHistogram();
+                }), DispatcherPriority.Loaded);
+                return;
+            }
+
+            double canvasWidth = HistogramCanvas.ActualWidth;
+            double canvasHeight = HistogramCanvas.ActualHeight;
+
+            // 找到所有通道的最大值用于归一化
+            uint maxValue = 0;
+            for (int i = 0; i < 256 * 4; i++)
+            {
+                if (_histogramData[i] > maxValue)
+                    maxValue = _histogramData[i];
+            }
+
+            if (maxValue == 0)
+            {
+                // 如果没有数据，显示空直方图
+                return;
+            }
+
+            // Photoshop 风格的直方图：绘制 RGB 三个通道和亮度通道
+            // 使用柱状图，每个 bin 一个矩形
+            double barWidth = canvasWidth / 256.0;
+            
+            // 绘制亮度通道（白色/灰色，作为背景）
+            for (int i = 0; i < 256; i++)
+            {
+                uint lumValue = _histogramData[768 + i]; // Luminance channel
+                if (lumValue > 0)
+                {
+                    double barHeight = (lumValue / (double)maxValue) * canvasHeight;
+                    System.Windows.Shapes.Rectangle rect = new System.Windows.Shapes.Rectangle
+                    {
+                        Width = Math.Max(0.5, barWidth),
+                        Height = Math.Max(1, barHeight),
+                        Fill = new SolidColorBrush(System.Windows.Media.Color.FromArgb(180, 200, 200, 200)),
+                        VerticalAlignment = VerticalAlignment.Bottom
+                    };
+                    Canvas.SetLeft(rect, i * barWidth);
+                    Canvas.SetBottom(rect, 0);
+                    HistogramCanvas.Children.Add(rect);
+                }
+            }
+
+            // 绘制 RGB 通道（叠加在亮度通道上）
+            // R channel (红色)
+            for (int i = 0; i < 256; i++)
+            {
+                uint rValue = _histogramData[i];
+                if (rValue > 0)
+                {
+                    double barHeight = (rValue / (double)maxValue) * canvasHeight;
+                    System.Windows.Shapes.Rectangle rect = new System.Windows.Shapes.Rectangle
+                    {
+                        Width = Math.Max(0.5, barWidth),
+                        Height = Math.Max(1, barHeight),
+                        Fill = new SolidColorBrush(System.Windows.Media.Color.FromArgb(200, 255, 0, 0)),
+                        VerticalAlignment = VerticalAlignment.Bottom
+                    };
+                    Canvas.SetLeft(rect, i * barWidth);
+                    Canvas.SetBottom(rect, 0);
+                    HistogramCanvas.Children.Add(rect);
+                }
+            }
+
+            // G channel (绿色)
+            for (int i = 0; i < 256; i++)
+            {
+                uint gValue = _histogramData[256 + i];
+                if (gValue > 0)
+                {
+                    double barHeight = (gValue / (double)maxValue) * canvasHeight;
+                    System.Windows.Shapes.Rectangle rect = new System.Windows.Shapes.Rectangle
+                    {
+                        Width = Math.Max(0.5, barWidth),
+                        Height = Math.Max(1, barHeight),
+                        Fill = new SolidColorBrush(System.Windows.Media.Color.FromArgb(200, 0, 255, 0)),
+                        VerticalAlignment = VerticalAlignment.Bottom
+                    };
+                    Canvas.SetLeft(rect, i * barWidth);
+                    Canvas.SetBottom(rect, 0);
+                    HistogramCanvas.Children.Add(rect);
+                }
+            }
+
+            // B channel (蓝色)
+            for (int i = 0; i < 256; i++)
+            {
+                uint bValue = _histogramData[512 + i];
+                if (bValue > 0)
+                {
+                    double barHeight = (bValue / (double)maxValue) * canvasHeight;
+                    System.Windows.Shapes.Rectangle rect = new System.Windows.Shapes.Rectangle
+                    {
+                        Width = Math.Max(0.5, barWidth),
+                        Height = Math.Max(1, barHeight),
+                        Fill = new SolidColorBrush(System.Windows.Media.Color.FromArgb(200, 0, 0, 255)),
+                        VerticalAlignment = VerticalAlignment.Bottom
+                    };
+                    Canvas.SetLeft(rect, i * barWidth);
+                    Canvas.SetBottom(rect, 0);
+                    HistogramCanvas.Children.Add(rect);
+                }
+            }
         }
     }
 }

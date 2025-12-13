@@ -20,9 +20,12 @@
 #include "d3d11rhi/D3D11RHI.h"
 #include "d3d11rhi/D3D11Texture2D.h"
 #include "d3d11rhi/RHIRenderTarget.h"
+#include <d3d11.h>
+#include <algorithm>
 
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "windowscodecs.lib")
+#pragma comment(lib, "d3d11.lib")
 
 using namespace RenderCore;
 using namespace LightroomCore;
@@ -501,6 +504,115 @@ void ResetImageAdjustParams(void* renderTargetHandle) {
             }
             break;
         }
+    }
+}
+
+bool GetHistogramData(void* renderTargetHandle, uint32_t* outHistogram) {
+    if (!renderTargetHandle || !outHistogram) {
+        return false;
+    }
+    
+    auto it = g_RenderTargetData.find(renderTargetHandle);
+    if (it == g_RenderTargetData.end()) {
+        return false;
+    }
+    
+    auto& data = it->second;
+    if (!data || !data->bHasImage || !data->ImageTexture) {
+        return false;
+    }
+    
+    try {
+        // 获取渲染后的输出纹理
+        auto* renderTargetInfo = g_RenderTargetManager->GetRenderTargetInfo(renderTargetHandle);
+        if (!renderTargetInfo || !renderTargetInfo->RHIRenderTarget) {
+            return false;
+        }
+        
+        auto outputTexture = g_RenderTargetManager->GetRHITexture(renderTargetHandle);
+        if (!outputTexture) {
+            return false;
+        }
+        
+        // 获取 D3D11 纹理
+        RenderCore::D3D11DynamicRHI* d3d11RHI = dynamic_cast<RenderCore::D3D11DynamicRHI*>(g_DynamicRHI.get());
+        if (!d3d11RHI) {
+            return false;
+        }
+        
+        auto d3d11Texture = std::dynamic_pointer_cast<RenderCore::D3D11Texture2D>(outputTexture);
+        if (!d3d11Texture) {
+            return false;
+        }
+        
+        ID3D11Texture2D* nativeTex = d3d11Texture->GetNativeTex();
+        if (!nativeTex) {
+            return false;
+        }
+        
+        // 获取纹理描述
+        D3D11_TEXTURE2D_DESC texDesc;
+        nativeTex->GetDesc(&texDesc);
+        
+        // 创建 staging texture 用于读取数据
+        ID3D11Device* device = d3d11RHI->GetDevice();
+        ID3D11DeviceContext* context = d3d11RHI->GetDeviceContext();
+        
+        D3D11_TEXTURE2D_DESC stagingDesc = texDesc;
+        stagingDesc.Usage = D3D11_USAGE_STAGING;
+        stagingDesc.BindFlags = 0;
+        stagingDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+        stagingDesc.MiscFlags = 0;
+        
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> stagingTexture;
+        HRESULT hr = device->CreateTexture2D(&stagingDesc, nullptr, stagingTexture.GetAddressOf());
+        if (FAILED(hr)) {
+            return false;
+        }
+        
+        // 从 GPU 拷贝到 staging texture
+        context->CopyResource(stagingTexture.Get(), nativeTex);
+        
+        // 映射并读取数据
+        D3D11_MAPPED_SUBRESOURCE mapped;
+        hr = context->Map(stagingTexture.Get(), 0, D3D11_MAP_READ, 0, &mapped);
+        if (FAILED(hr)) {
+            return false;
+        }
+        
+        // 初始化直方图数组（256 bins * 4 channels: R, G, B, Luminance）
+        memset(outHistogram, 0, 256 * 4 * sizeof(uint32_t));
+        
+        // 采样像素（为了性能，只采样部分像素）
+        uint32_t sampleStep = std::max(1u, std::max(texDesc.Width / 256, texDesc.Height / 256));
+        
+        const uint8_t* srcData = static_cast<const uint8_t*>(mapped.pData);
+        for (uint32_t y = 0; y < texDesc.Height; y += sampleStep) {
+            for (uint32_t x = 0; x < texDesc.Width; x += sampleStep) {
+                uint32_t pixelOffset = y * mapped.RowPitch + x * 4; // BGRA format
+                
+                uint8_t b = srcData[pixelOffset + 0];
+                uint8_t g = srcData[pixelOffset + 1];
+                uint8_t r = srcData[pixelOffset + 2];
+                
+                // 计算亮度 (使用 Rec. 709 标准)
+                float luminance = 0.2126f * r + 0.7152f * g + 0.0722f * b;
+                uint8_t lum = static_cast<uint8_t>(luminance);
+                
+                // 更新直方图
+                outHistogram[r]++;           // R channel
+                outHistogram[256 + g]++;    // G channel
+                outHistogram[512 + b]++;    // B channel
+                outHistogram[768 + lum]++;  // Luminance
+            }
+        }
+        
+        context->Unmap(stagingTexture.Get(), 0);
+        return true;
+    }
+    catch (const std::exception& e) {
+        std::cerr << "[SDK] Exception getting histogram: " << e.what() << std::endl;
+        return false;
     }
 }
 

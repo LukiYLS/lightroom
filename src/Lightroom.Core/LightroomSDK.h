@@ -57,5 +57,10 @@ extern "C" {
     
     // 重置图像调整参数为默认值
     LIGHTROOM_API void ResetImageAdjustParams(void* renderTargetHandle);
+    
+    // 获取直方图数据（从渲染后的纹理读取）
+    // outHistogram: 输出数组，大小为 256 * 4 (R, G, B, Luminance)，每个通道 256 个值
+    // 返回是否成功
+    LIGHTROOM_API bool GetHistogramData(void* renderTargetHandle, uint32_t* outHistogram);
 }
 

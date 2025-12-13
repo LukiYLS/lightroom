@@ -118,6 +118,9 @@ namespace Lightroom.App.Core
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         public static extern void ResetImageAdjustParams(IntPtr renderTargetHandle);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern bool GetHistogramData(IntPtr renderTargetHandle, [Out] uint[] outHistogram);
     }
 }
 
