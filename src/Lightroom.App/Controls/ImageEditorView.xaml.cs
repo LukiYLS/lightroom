@@ -19,6 +19,8 @@ namespace Lightroom.App.Controls
         private double _zoomLevel = 1.0;
         private string? _currentImagePath = null;
         private uint[] _histogramData = new uint[256 * 4]; // R, G, B, Luminance (每个 256 bins)
+        private bool _isInitializing = false;
+        private bool _isResizing = false;
 
         public event EventHandler<double>? ZoomChanged;
         
@@ -82,6 +84,7 @@ namespace Lightroom.App.Controls
             InitializeComponent();
             Loaded += ImageEditorView_Loaded;
             Unloaded += ImageEditorView_Unloaded;
+            SizeChanged += ImageEditorView_SizeChanged;
         }
 
         private void ImageEditorView_Loaded(object sender, RoutedEventArgs e)
@@ -98,6 +101,8 @@ namespace Lightroom.App.Controls
         {
             try
             {
+                _isInitializing = true;
+                
                 // 获取渲染区域大小
                 var width = (uint)ActualWidth;
                 var height = (uint)ActualHeight;
@@ -152,10 +157,13 @@ namespace Lightroom.App.Controls
                 _renderTimer.Interval = TimeSpan.FromMilliseconds(16); // ~60 FPS
                 _renderTimer.Tick += RenderTimer_Tick;
                 _renderTimer.Start();
+                
+                _isInitializing = false;
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error initializing D3D rendering: {ex.Message}");
+                _isInitializing = false;
             }
         }
 
@@ -263,6 +271,80 @@ namespace Lightroom.App.Controls
         public IntPtr GetRenderTargetHandle()
         {
             return _renderTargetHandle;
+        }
+
+        private void ImageEditorView_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            if (_renderTargetHandle == IntPtr.Zero)
+                return;
+
+            // 如果正在初始化或正在 resize，忽略
+            if (_isInitializing || _isResizing)
+                return;
+
+            // 获取新的尺寸
+            uint newWidth = (uint)Math.Max(1, (int)ActualWidth);
+            uint newHeight = (uint)Math.Max(1, (int)ActualHeight);
+
+            // 如果尺寸没有变化，不需要更新
+            if (newWidth == 0 || newHeight == 0)
+                return;
+
+            try
+            {
+                _isResizing = true;
+
+                // 保存当前状态
+                string? savedImagePath = _currentImagePath;
+                double savedZoomLevel = _zoomLevel;
+
+                // 调用 SDK 更新渲染目标尺寸
+                NativeMethods.ResizeRenderTarget(_renderTargetHandle, newWidth, newHeight);
+                System.Diagnostics.Debug.WriteLine($"[ImageEditorView] Resized render target to {newWidth}x{newHeight}");
+
+                // 获取新的共享句柄并更新 D3DImage
+                IntPtr newSharedHandle = NativeMethods.GetRenderTargetSharedHandle(_renderTargetHandle);
+                if (newSharedHandle != IntPtr.Zero && _d3dImage != null)
+                {
+                    _sharedHandle = newSharedHandle;
+                    _d3dImage.Lock();
+                    try
+                    {
+                        _d3dImage.SetBackBuffer(System.Windows.Interop.D3DResourceType.IDirect3DSurface9, _sharedHandle, true);
+                    }
+                    finally
+                    {
+                        _d3dImage.Unlock();
+                    }
+                }
+
+                // 如果之前有加载图片，需要重新加载
+                if (!string.IsNullOrEmpty(savedImagePath))
+                {
+                    // 延迟重新加载图片，等待 resize 完成
+                    Dispatcher.BeginInvoke(new Action(() => {
+                        LoadImage(savedImagePath);
+                        
+                        // 恢复缩放级别
+                        if (savedZoomLevel != _zoomLevel)
+                        {
+                            _zoomLevel = savedZoomLevel;
+                            UpdateZoom();
+                        }
+                        
+                        _isResizing = false;
+                    }), DispatcherPriority.Loaded);
+                }
+                else
+                {
+                    _isResizing = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ImageEditorView] Error resizing render target: {ex.Message}");
+                _isResizing = false;
+            }
         }
 
         private void UpdateHistogram()
