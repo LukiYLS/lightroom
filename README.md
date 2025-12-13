@@ -1,45 +1,92 @@
-# Lightroom Clone Framework
+# Lightroom Clone
 
-A Lightroom-like image editing application prototype featuring WPF frontend and C++ backend SDK with GPU-accelerated rendering.
+A professional-grade image and video editing application built with WPF frontend and C++ backend, featuring GPU-accelerated rendering and real-time adjustments.
+
+## Overview
+
+Lightroom Clone is a desktop application that provides a Lightroom-like editing experience for both images and videos. It features a modern WPF user interface with a powerful C++ SDK backend that leverages DirectX 11 for GPU-accelerated image processing and rendering.
 
 ## Features
 
-- **GPU-Accelerated Rendering**: DirectX 11 based rendering pipeline with D3D11 to D3D9 interop for WPF display
-- **Modular Architecture**: Separated rendering nodes (Scale, Brightness/Contrast, Passthrough) for flexible image processing
-- **Aspect Ratio Preservation**: Automatic letterbox/pillarbox handling to maintain image aspect ratio
-- **Zoom & Pan Support**: Interactive zoom and pan controls with real-time rendering
-- **Folder Browsing**: Select folders and browse images as thumbnails in filmstrip view
-- **RHI Abstraction Layer**: High-level rendering interface for DirectX 11 operations
+### Image Editing
+- **RAW Image Support**: Full support for RAW formats via LibRaw
+- **Standard Image Formats**: JPEG, PNG, TIFF, and more via WIC (Windows Imaging Component)
+- **Real-time Adjustments**: 
+  - Exposure, Contrast, Highlights, Shadows, Whites, Blacks
+  - White Balance (Temperature, Tint)
+  - Vibrance, Saturation
+  - Sharpness, Noise Reduction
+  - Vignette, Grain
+  - HSL adjustments for individual color ranges
+- **LUT Filters**: Support for 3D LUT (.cube) files for cinematic color grading
+- **GPU-Accelerated Processing**: All adjustments processed in real-time on GPU
 
-## Screenshots
+### Video Editing
+- **Video Format Support**: MP4, MOV, AVI, MKV via FFmpeg
+- **Real-time Video Playback**: Smooth video playback with frame-by-frame rendering
+- **Video Adjustments**: All image adjustment parameters apply to video frames in real-time
+- **Video Thumbnails**: Automatic thumbnail generation for video files in filmstrip view
 
-### Main Application Window
+### User Interface
+- **Modern WPF UI**: Clean, professional interface with dark theme
+- **Filmstrip View**: Thumbnail navigation for images and videos
+- **Zoom & Pan**: Interactive zoom controls with aspect ratio preservation
+- **Adjustment Panels**: Intuitive controls for all image/video parameters
+- **Histogram Display**: Real-time histogram for exposure analysis
 
-![Application Screenshot](screenshot/App.png)
-
-The main window features:
-- **Left Panel**: Folder selection and image count display
-- **Center Panel**: Image editor with GPU-accelerated rendering, zoom controls, and aspect ratio preservation
-- **Bottom Panel**: Filmstrip view showing thumbnails of all images in the selected folder
-- **Right Panel**: Image adjustment controls (brightness, contrast, etc.)
+### Technical Features
+- **GPU Rendering Pipeline**: DirectX 11 based rendering with D3D11 to D3D9 interop for WPF
+- **Modular Architecture**: Render graph system with pluggable processing nodes
+- **RHI Abstraction**: High-level rendering interface for DirectX 11 operations
+- **Zero-Copy Texture Sharing**: Efficient texture sharing between D3D11 and D3D9
 
 ## Project Structure
 
 ```
 lightroom/
 ├── src/
-│   ├── Lightroom.App/          # WPF UI Application (C#)
-│   │   ├── Controls/           # UI Controls (LeftPanel, ImageEditorView, FilmstripView, etc.)
-│   │   └── Core/                # P/Invoke wrappers
-│   └── Lightroom.Core/          # Image Processing SDK (C++)
-│       ├── d3d11rhi/            # DirectX 11 RHI abstraction layer
-│       ├── RenderNodes/          # Rendering nodes (Scale, BrightnessContrast, Passthrough)
-│       ├── D3D9Interop.*         # D3D11 to D3D9 interop for WPF D3DImage
-│       ├── ImageProcessor.*      # Image loading using WIC
-│       ├── RenderGraph.*         # Render graph management
-│       └── RenderTargetManager.* # Render target lifecycle management
-├── screenshot/                   # Application screenshots
-└── LightroomClone.sln          # Visual Studio solution file
+│   ├── Lightroom.App/              # WPF UI Application (C# .NET 8.0)
+│   │   ├── Controls/                # UI Controls
+│   │   │   ├── FilmstripView.*      # Thumbnail filmstrip
+│   │   │   ├── ImageEditorView.*    # Main image/video editor
+│   │   │   ├── LeftPanel.*          # Folder browser
+│   │   │   ├── RightPanel.*         # Adjustment controls
+│   │   │   ├── TopMenuBar.*         # Menu bar
+│   │   │   └── ThumbnailItem.*      # Thumbnail item
+│   │   └── Core/
+│   │       └── NativeMethods.cs     # P/Invoke declarations
+│   │
+│   └── Lightroom.Core/              # Image/Video Processing SDK (C++)
+│       ├── d3d11rhi/                # DirectX 11 RHI abstraction layer
+│       ├── RenderNodes/              # Rendering nodes
+│       │   ├── ImageAdjustNode.*     # Image adjustments (exposure, contrast, etc.)
+│       │   ├── FilterNode.*          # LUT filter application
+│       │   ├── ScaleNode.*           # Scaling, zoom, pan
+│       │   └── RenderNode.*         # Base render node class
+│       ├── ImageProcessing/          # Image loading and processing
+│       │   └── ImageProcessor.*     # WIC-based image loading
+│       ├── VideoProcessing/          # Video decoding and processing
+│       │   ├── FFmpegVideoLoader.*   # FFmpeg video decoder
+│       │   ├── VideoProcessor.*      # Video processing wrapper
+│       │   └── LightroomSDK_Video.* # Video SDK APIs
+│       ├── D3D9Interop.*             # D3D11 to D3D9 interop for WPF
+│       ├── RenderGraph.*             # Render graph management
+│       ├── RenderTargetManager.*     # Render target lifecycle
+│       └── LightroomSDK.*            # Main SDK API
+│
+├── third_party/
+│   ├── ffmpeg/                      # FFmpeg libraries (headers, libs, DLLs)
+│   └── libraw/                      # LibRaw for RAW image support
+│
+├── resources/
+│   └── luts/                        # 3D LUT files (.cube)
+│
+├── docs/                            # Documentation
+│   ├── VIDEO_SUPPORT_ARCHITECTURE.md
+│   ├── VIDEO_DECODER_IMPLEMENTATION.md
+│   └── TROUBLESHOOTING_DLL.md
+│
+└── LightroomClone.sln              # Visual Studio solution
 ```
 
 ## Architecture
@@ -47,124 +94,230 @@ lightroom/
 ### High-Level Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    WPF Application                       │
-│  (User Interface, Controls, Event Handling)             │
-└────────────────────┬────────────────────────────────────┘
-                     │ P/Invoke
-┌────────────────────▼────────────────────────────────────┐
-│              Lightroom Core SDK (C++)                    │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
-│  │ Image        │  │ Render      │  │ D3D9        │  │
-│  │ Processor    │→ │ Graph       │→ │ Interop     │  │
-│  │ (WIC)        │  │ (Nodes)     │  │ (WPF)       │  │
-│  └──────────────┘  └──────────────┘  └──────────────┘  │
-│         │                  │                  │         │
-│         └──────────────────┴──────────────────┘         │
-│                          │                              │
-│              ┌───────────▼───────────┐                 │
-│              │   D3D11 RHI Layer     │                 │
-│              │  (Abstraction Layer)  │                 │
-│              └───────────┬───────────┘                 │
-│                          │                              │
-└──────────────────────────┼──────────────────────────────┘
-                           │
-              ┌────────────▼────────────┐
-              │   DirectX 11 API        │
-              │   (GPU Rendering)       │
-              └─────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                    WPF Application (C#)                      │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐    │
+│  │   UI Controls │  │  Event       │  │  P/Invoke     │    │
+│  │   (XAML)      │  │  Handling    │  │  Wrappers     │    │
+│  └──────────────┘  └──────────────┘  └──────┬────────┘    │
+└───────────────────────────────────────────────┼────────────┘
+                                                 │
+                                    ┌────────────▼────────────┐
+                                    │  Lightroom Core SDK    │
+                                    │       (C++)            │
+                                    └────────────┬───────────┘
+                                                 │
+        ┌────────────────────────────────────────┼────────────────────────┐
+        │                                        │                        │
+┌───────▼────────┐                    ┌─────────▼──────────┐   ┌─────────▼──────────┐
+│ Image          │                    │ Video              │   │ Render            │
+│ Processor      │                    │ Processor          │   │ Graph             │
+│ (WIC/LibRaw)   │                    │ (FFmpeg)           │   │ (Nodes)           │
+└───────┬────────┘                    └─────────┬──────────┘   └─────────┬──────────┘
+        │                                        │                        │
+        └────────────────────────────────────────┴────────────────────────┘
+                                         │
+                            ┌────────────▼────────────┐
+                            │   D3D11 RHI Layer      │
+                            │  (Abstraction Layer)    │
+                            └────────────┬────────────┘
+                                         │
+                            ┌────────────▼────────────┐
+                            │   DirectX 11 API       │
+                            │   (GPU Rendering)       │
+                            └─────────────────────────┘
 ```
 
 ### Rendering Pipeline
 
-1. **Image Loading**: WIC (Windows Imaging Component) loads images into D3D11 textures
-2. **Render Graph**: Modular rendering nodes process the image
+1. **Media Loading**:
+   - Images: WIC (Windows Imaging Component) or LibRaw for RAW files
+   - Videos: FFmpeg for decoding video frames
+   - Both are loaded into D3D11 textures
+
+2. **Render Graph Execution**:
+   - `ImageAdjustNode`: Applies exposure, contrast, highlights, shadows, white balance, etc.
+   - `FilterNode`: Applies 3D LUT filters for color grading
    - `ScaleNode`: Handles scaling, zoom, pan, and aspect ratio preservation
-   - `BrightnessContrastNode`: Adjusts image brightness and contrast
-   - `PassthroughNode`: Direct copy without processing
-3. **D3D11 to D3D9 Interop**: Shared textures between D3D11 and D3D9 for WPF display
-4. **WPF Display**: D3DImage displays the final result
+   - Nodes are chained together in a render graph
+
+3. **D3D11 to D3D9 Interop**:
+   - Shared textures between D3D11 and D3D9
+   - GPU-accelerated copy to D3D9 surface for WPF display
+
+4. **WPF Display**:
+   - D3DImage displays the final rendered result
+   - Real-time updates as adjustments are made
+
+## Prerequisites
+
+### Required Software
+- **Visual Studio 2022** with:
+  - .NET desktop development workload
+  - Desktop development with C++ workload
+  - Windows 10/11 SDK
+
+### Required Libraries
+- **FFmpeg**: Pre-built libraries in `third_party/ffmpeg/`
+  - Headers: `third_party/ffmpeg/include/`
+  - Libraries: `third_party/ffmpeg/lib/`
+  - DLLs: `third_party/ffmpeg/bin/` (copied to output directory)
+- **LibRaw**: Pre-built libraries in `third_party/libraw/`
+  - DLL: `third_party/libraw/buildfiles/release-x86_64/libraw.dll`
 
 ## Building the Project
 
-### Prerequisites
+### 1. Clone the Repository
+```bash
+git clone <repository-url>
+cd lightroom
+```
 
-- **Visual Studio 2022** with the following workloads:
-  - .NET desktop development
-  - Desktop development with C++
+### 2. Verify Dependencies
+Ensure the following directories exist:
+- `third_party/ffmpeg/include/` - FFmpeg headers
+- `third_party/ffmpeg/lib/` - FFmpeg libraries (.lib files)
+- `third_party/ffmpeg/bin/` - FFmpeg DLLs
+- `third_party/libraw/buildfiles/release-x86_64/libraw.dll` - LibRaw DLL
 
-### Build Steps
+If FFmpeg is missing, see `third_party/ffmpeg/README_SETUP.md` for setup instructions.
 
-1. **Open the Solution**
-   ```bash
-   # Open LightroomClone.sln in Visual Studio 2022
-   ```
+### 3. Open in Visual Studio
+```bash
+# Open LightroomClone.sln in Visual Studio 2022
+```
 
-2. **Configure C++ Project** (if needed)
-   - If the C++ project is not visible in Solution Explorer:
-     - Right-click on the solution → **Add → Existing Project**
-     - Select `src\Lightroom.Core\Lightroom.Core.vcxproj`
-   - Set project dependencies:
-     - Right-click `Lightroom.App` → **Build Dependencies → Project Dependencies**
-     - Check `LightroomCore` to ensure correct build order
+### 4. Configure Build
+- Select **x64** platform (required for C++ SDK)
+- Select **Debug** or **Release** configuration
+- Ensure `Lightroom.App` is set as the startup project
 
-3. **Build Configuration**
-   - Select **Debug** or **Release** configuration
-   - Select **x64** platform (C++ SDK defaults to x64)
-   - Build the solution (F6 or Build → Build Solution)
+### 5. Build
+- Press **F6** or **Build → Build Solution**
+- The build process will:
+  - Compile the C++ SDK (`Lightroom.Core`)
+  - Compile the WPF application (`Lightroom.App`)
+  - Copy native DLLs to the output directory:
+    - `LightroomCore.dll`
+    - `libraw.dll`
+    - FFmpeg DLLs (from `third_party/ffmpeg/bin/`)
 
-4. **Run**
-   - Set `Lightroom.App` as the startup project
-   - Press F5 to run
-
-## Key Technologies
-
-- **WPF (Windows Presentation Foundation)**: Modern UI framework for Windows
-- **DirectX 11**: GPU-accelerated rendering
-- **DirectX 9 Interop**: Sharing textures with WPF D3DImage
-- **WIC (Windows Imaging Component)**: Image format support (JPEG, PNG, etc.)
-- **HLSL Shaders**: GPU shaders for image processing
-- **P/Invoke**: Interoperability between C# and C++
+### 6. Run
+- Press **F5** to run the application
+- Or set `Lightroom.App` as startup project and run
 
 ## Usage
 
-1. **Select a Folder**: Click "Select Folder" in the left panel to browse for image folders
-2. **Browse Images**: Thumbnails appear in the bottom filmstrip view
-3. **Load Image**: Click a thumbnail to load it into the center editor
-4. **Zoom**: Use the +/- buttons or "1:1" button to zoom in/out or fit to window
-5. **Adjustments**: Use the right panel to adjust image parameters (brightness, contrast, etc.)
+### Loading Images
+1. Click **"Select Folder"** in the left panel
+2. Browse and select a folder containing images
+3. Thumbnails appear in the bottom filmstrip view
+4. Click a thumbnail to load it into the center editor
+
+### Loading Videos
+1. Select a folder containing video files (MP4, MOV, AVI, MKV)
+2. Video thumbnails appear in the filmstrip with a play icon overlay
+3. Click a video thumbnail to load and play it
+4. Videos play automatically and can be paused/resumed
+
+### Image/Video Adjustments
+Use the right panel to adjust parameters:
+- **Basic**: Exposure, Contrast, Highlights, Shadows, Whites, Blacks
+- **Color**: Temperature, Tint, Vibrance, Saturation
+- **Detail**: Sharpness, Noise Reduction
+- **Effects**: Vignette, Grain
+
+All adjustments apply in real-time to both images and videos.
+
+### Applying Filters
+1. Use the filter selector in the right panel
+2. Choose from available 3D LUT files in `resources/luts/`
+3. Adjust filter intensity with the slider
+
+### Zoom Controls
+- **+/- Buttons**: Zoom in/out
+- **1:1 Button**: Fit image to window
+- **Pan**: Click and drag to pan when zoomed in
+
+## Key Technologies
+
+- **WPF (Windows Presentation Foundation)**: Modern UI framework
+- **.NET 8.0**: Latest .NET framework
+- **DirectX 11**: GPU-accelerated rendering
+- **DirectX 9 Interop**: Texture sharing with WPF D3DImage
+- **FFmpeg**: Video decoding and processing
+- **LibRaw**: RAW image format support
+- **WIC (Windows Imaging Component)**: Standard image format support
+- **HLSL Shaders**: GPU shaders for image processing
+- **P/Invoke**: C# to C++ interop
 
 ## Technical Highlights
 
+### GPU-Accelerated Rendering
+- All image processing happens on the GPU
+- Real-time adjustments with no CPU overhead
+- Efficient texture operations using DirectX 11
+
+### Modular Render Graph
+- Pluggable render nodes for flexible processing pipelines
+- Easy to add new processing nodes
+- Chain multiple nodes together for complex effects
+
 ### Aspect Ratio Preservation
+- Automatic letterbox/pillarbox for different aspect ratios
+- No image distortion
+- Smart scaling algorithm
 
-The `ScaleNode` automatically maintains image aspect ratio:
-- Calculates `FitScale = min(OutputWidth/InputWidth, OutputHeight/InputHeight)`
-- Ensures the image fits within the viewport without distortion
-- Automatically adds letterbox (horizontal black bars) or pillarbox (vertical black bars) as needed
+### Video Processing
+- Frame-by-frame decoding via FFmpeg
+- Real-time adjustment application to video frames
+- Efficient texture management for video playback
 
-### GPU Rendering Pipeline
+## Troubleshooting
 
-- **RHI Abstraction**: High-level rendering interface for DirectX 11
-- **Render Nodes**: Modular processing units that can be chained together
-- **Constant Buffers**: Efficient parameter passing to GPU shaders
-- **Shared Textures**: Zero-copy texture sharing between D3D11 and D3D9
+### DLL Loading Issues
+If you encounter DLL loading errors, see `docs/TROUBLESHOOTING_DLL.md` for detailed troubleshooting steps.
 
-### Code Organization
+Common issues:
+- Missing `LightroomCore.dll`: Ensure C++ project built successfully
+- Missing FFmpeg DLLs: Check `third_party/ffmpeg/bin/` exists and DLLs are copied
+- Missing `libraw.dll`: Verify LibRaw DLL path in project settings
+- Architecture mismatch: Ensure all DLLs are x64
 
-- **Separation of Concerns**: UI, image processing, and rendering are separated
-- **Modular Design**: Each render node is in its own file with a common base class
-- **RHI Abstraction**: All DirectX 11 operations go through the RHI layer, not direct API calls
+### Build Errors
+- **C++ compilation errors**: Check file encoding (should be UTF-8 with BOM)
+- **Linker errors**: Verify all library paths are correct
+- **P/Invoke errors**: Ensure function signatures match between C# and C++
+
+## Development
+
+### Adding New Adjustment Parameters
+1. Add parameter to `ImageAdjustParams` struct in `LightroomSDKTypes.h`
+2. Update `ImageAdjustNode` shader to apply the adjustment
+3. Add UI control in `RightPanel.xaml`
+4. Wire up event handler in `MainWindow.xaml.cs`
+
+### Adding New Render Nodes
+1. Create new class inheriting from `RenderNode`
+2. Implement `Execute()` method
+3. Add HLSL shader code for processing
+4. Register node in render graph
+
+### Video Format Support
+Video formats are handled by FFmpeg. To add support for new formats:
+1. Ensure FFmpeg is compiled with the required codec
+2. Update `IsVideoFormat()` in `LightroomSDK_Video.cpp` if needed
 
 ## Future Enhancements
 
-- [ ] Additional image adjustment nodes (exposure, saturation, etc.)
 - [ ] Undo/Redo functionality
-- [ ] Image export functionality
+- [ ] Image export with quality settings
 - [ ] Batch processing support
-- [ ] GPU-accelerated filters and effects
-- [ ] Support for RAW image formats
-- [ ] Multi-threaded image processing
+- [ ] Video export functionality
+- [ ] Additional adjustment parameters
+- [ ] Custom LUT creation tools
+- [ ] Multi-threaded processing
+- [ ] Performance optimizations
 
 ## License
 
@@ -173,3 +326,9 @@ This is a prototype project for educational and research purposes.
 ## Contributing
 
 Contributions are welcome! Please feel free to submit issues or pull requests.
+
+## Acknowledgments
+
+- **FFmpeg**: Video decoding library
+- **LibRaw**: RAW image processing library
+- **DirectX**: GPU rendering APIs
