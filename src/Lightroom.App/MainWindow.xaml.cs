@@ -38,12 +38,12 @@ namespace Lightroom.App
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            // 初始化示例数据
-            FilmstripViewControl.LoadThumbnails(new List<string> 
-            { 
-                "Image 1", "Image 2", "Image 3", "Image 4", "Image 5" 
-            });
-            LeftPanelControl.UpdateImageCount(5);
+            // 不初始化示例数据，等待用户选择目录
+            // FilmstripViewControl.LoadThumbnails(new List<string> 
+            // { 
+            //     "Image 1", "Image 2", "Image 3", "Image 4", "Image 5" 
+            // });
+            // LeftPanelControl.UpdateImageCount(5);
         }
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)

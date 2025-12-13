@@ -194,18 +194,6 @@
                     </StackPanel>
                 </Expander>
                 
-                <!-- HSL/颜色 -->
-                <Expander Header="HSL / 颜色" IsExpanded="False" 
-                         Foreground="White" 
-                         Margin="0,0,0,10">
-                    <StackPanel Margin="0,10,0,0">
-                        <TextBlock Text="HSL 调整功能正在开发中..." 
-                                  Foreground="#999999" 
-                                  FontSize="11" 
-                                  Margin="0,20"/>
-                    </StackPanel>
-                </Expander>
-                
                 <!-- 细节 -->
                 <Expander Header="细节" IsExpanded="False" 
                          Foreground="White" 
@@ -277,6 +265,30 @@
                                    Minimum="0" Maximum="100" Value="0" 
                                    ValueChanged="Slider_ValueChanged"/>
                         </StackPanel>
+                    </StackPanel>
+                </Expander>
+                
+                <!-- 滤镜 -->
+                <Expander Header="滤镜" IsExpanded="False" 
+                         Foreground="White" 
+                         Margin="0,0,0,10">
+                    <StackPanel Margin="0,10,0,0">
+                        <TextBlock Text="滤镜功能正在开发中..." 
+                                  Foreground="#999999" 
+                                  FontSize="11" 
+                                  Margin="0,20"/>
+                    </StackPanel>
+                </Expander>
+                
+                <!-- 艺术效果 -->
+                <Expander Header="艺术效果" IsExpanded="False" 
+                         Foreground="White" 
+                         Margin="0,0,0,10">
+                    <StackPanel Margin="0,10,0,0">
+                        <TextBlock Text="艺术效果功能正在开发中..." 
+                                  Foreground="#999999" 
+                                  FontSize="11" 
+                                  Margin="0,20"/>
                     </StackPanel>
                 </Expander>
                 

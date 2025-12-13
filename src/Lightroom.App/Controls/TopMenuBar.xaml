@@ -46,6 +46,38 @@
         <StackPanel Grid.Column="2" Orientation="Horizontal" 
                     VerticalAlignment="Center" 
                     Margin="0,0,15,0">
+            <Button Content="导出" Padding="10,5" 
+                    Background="#3F3F46" Foreground="White" 
+                    BorderThickness="0" 
+                    Click="Export_Click"
+                    x:Name="ExportButton"
+                    Cursor="Hand"
+                    Margin="0,0,10,0">
+                <Button.Style>
+                    <Style TargetType="Button">
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}" 
+                                           CornerRadius="4"
+                                           Padding="{TemplateBinding Padding}">
+                                        <ContentPresenter HorizontalAlignment="Center" 
+                                                        VerticalAlignment="Center"/>
+                                    </Border>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#4F4F56"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="#2F2F36"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
             <Button Content="Library" Padding="10,5" 
                     Background="#0078D4" Foreground="White" 
                     BorderThickness="0" 
@@ -59,6 +91,7 @@
         </StackPanel>
     </Grid>
 </UserControl>
+
 
 
 

@@ -615,6 +615,134 @@ bool ImageAdjustNode::InitializeShaderResources() {
     )";
     
     const char* psCodePart3 = R"(
+        // 获取缩放因子（用于根据图像尺寸调整采样范围）
+        float GetScaleFactor(float2 uv) {
+            float standardWidth = 1920.0;
+            float standardHeight = 1080.0;
+            float scaleX = ImageWidth / standardWidth;
+            float scaleY = ImageHeight / standardHeight;
+            return min(scaleX, scaleY);
+        }
+        
+        // 高斯模糊采样（基于标准高斯核）
+        // 注意：这个函数从输入纹理采样，用于柔化模式
+        float3 GaussianBlur(float2 uv, float sigma) {
+            float2 texelSize = float2(ddx(uv.x), ddy(uv.y));
+            if (length(texelSize) < 0.0001) {
+                texelSize = float2(1.0 / ImageWidth, 1.0 / ImageHeight);
+            }
+            sigma = clamp(sigma, 0.5, 5.0);
+            float2 offset1 = float2(1.0, 0.0) * texelSize * sigma;
+            float2 offset2 = float2(0.0, 1.0) * texelSize * sigma;
+            float2 offset3 = float2(1.0, 1.0) * texelSize * sigma * 0.707;
+            float w0 = 0.2270270270;
+            float w1 = 0.1945945946;
+            float w2 = 0.1216216216;
+            float weightSum = w0 + w1 * 4.0 + w2 * 4.0;
+            w0 /= weightSum;
+            w1 /= weightSum;
+            w2 /= weightSum;
+            float3 result = InputTexture.Sample(InputSampler, uv).rgb * w0;
+            result += InputTexture.Sample(InputSampler, uv + offset1).rgb * w1;
+            result += InputTexture.Sample(InputSampler, uv - offset1).rgb * w1;
+            result += InputTexture.Sample(InputSampler, uv + offset2).rgb * w1;
+            result += InputTexture.Sample(InputSampler, uv - offset2).rgb * w1;
+            result += InputTexture.Sample(InputSampler, uv + float2(offset3.x, offset3.y)).rgb * w2;
+            result += InputTexture.Sample(InputSampler, uv + float2(-offset3.x, offset3.y)).rgb * w2;
+            result += InputTexture.Sample(InputSampler, uv + float2(offset3.x, -offset3.y)).rgb * w2;
+            result += InputTexture.Sample(InputSampler, uv + float2(-offset3.x, -offset3.y)).rgb * w2;
+            return result;
+        }
+        
+        // 对当前处理后的颜色进行高斯模糊（用于锐化）
+        // 需要采样周围像素并应用相同的调整
+        float3 GaussianBlurCurrentColor(float2 uv, float sigma, float3 centerColor) {
+            float2 texelSize = float2(ddx(uv.x), ddy(uv.y));
+            if (length(texelSize) < 0.0001) {
+                texelSize = float2(1.0 / ImageWidth, 1.0 / ImageHeight);
+            }
+            sigma = clamp(sigma, 0.5, 5.0);
+            float2 offset1 = float2(1.0, 0.0) * texelSize * sigma;
+            float2 offset2 = float2(0.0, 1.0) * texelSize * sigma;
+            float2 offset3 = float2(1.0, 1.0) * texelSize * sigma * 0.707;
+            float w0 = 0.2270270270;
+            float w1 = 0.1945945946;
+            float w2 = 0.1216216216;
+            float weightSum = w0 + w1 * 4.0 + w2 * 4.0;
+            w0 /= weightSum;
+            w1 /= weightSum;
+            w2 /= weightSum;
+            // 采样周围像素（这些像素也需要经过相同的调整，但为了简化，我们直接从纹理采样）
+            // 注意：这是近似，理想情况下应该对每个采样点应用相同的调整
+            float3 result = centerColor * w0;
+            result += InputTexture.Sample(InputSampler, uv + offset1).rgb * w1;
+            result += InputTexture.Sample(InputSampler, uv - offset1).rgb * w1;
+            result += InputTexture.Sample(InputSampler, uv + offset2).rgb * w1;
+            result += InputTexture.Sample(InputSampler, uv - offset2).rgb * w1;
+            result += InputTexture.Sample(InputSampler, uv + float2(offset3.x, offset3.y)).rgb * w2;
+            result += InputTexture.Sample(InputSampler, uv + float2(-offset3.x, offset3.y)).rgb * w2;
+            result += InputTexture.Sample(InputSampler, uv + float2(offset3.x, -offset3.y)).rgb * w2;
+            result += InputTexture.Sample(InputSampler, uv + float2(-offset3.x, -offset3.y)).rgb * w2;
+            return result;
+        }
+        
+        float ConvertDetailToGrayscale(float3 detail) {
+            return dot(detail, float3(0.299, 0.587, 0.114));
+        }
+        
+        float ApplyThresholdMask(float detail, float threshold) {
+            float absDetail = abs(detail);
+            absDetail *= 2.0;
+            float mask = smoothstep(threshold * 0.5, threshold * 1.5, absDetail);
+            return detail * mask;
+        }
+        
+        float3 ApplyClarity(float3 color, float2 uv, float clarityValue) {
+            // 移除早期返回，确保总是执行（即使 clarityValue = 0）
+            // if (abs(clarityValue) < 0.01) return color;
+            float scaleFactor = GetScaleFactor(uv);
+            if (clarityValue < 0.0) {
+                // 柔化处理（负值，-100% ~ 0%）
+                float refSigma = -clarityValue * 0.05;
+                refSigma = clamp(refSigma, 0.5, 10.0);
+                return GaussianBlur(uv, refSigma);
+            }
+            else {
+                // 锐化处理（正值，非锐化掩码）
+                // 严格按照用户提供的算法实现，但增强效果以便调试
+                float amount = clarityValue * 0.3;  // 临时增加到 0.3 以便看到效果
+                float radius;
+                
+                if (clarityValue <= 10.0) {
+                    radius = 1.5;
+                }
+                else {
+                    radius = (1.0 + clarityValue / 25.0) * scaleFactor;
+                }
+                radius = clamp(radius, 0.5, 10.0);
+                
+                // 步骤1: 高斯模糊（对输入纹理进行模糊）
+                float3 blurred = GaussianBlur(uv, radius);
+                
+                // 步骤2: 计算原始图像与模糊图像的差值
+                float3 originalColor = InputTexture.Sample(InputSampler, uv).rgb;
+                float3 detail = originalColor - blurred;
+                
+                // 步骤3: 将细节图转换为灰度图
+                float grayDetail = ConvertDetailToGrayscale(detail);
+                
+                // 步骤4: 应用阈值处理（临时降低阈值以便看到效果）
+                grayDetail = ApplyThresholdMask(grayDetail, 0.01);  // 临时降低到 0.01
+                
+                // 步骤5: 将灰度细节图应用到当前处理后的颜色
+                float3 sharpened = color + grayDetail * amount;
+                
+                return saturate(sharpened);
+            }
+        }
+    )";
+    
+    const char* psCodePart4 = R"(
         // ============================================
         // 主函数 - 逐个添加算法调用
         // ============================================
@@ -673,8 +801,13 @@ bool ImageAdjustNode::InitializeShaderResources() {
             // TODO: 7. 校准调整 (ShadowTint, RedHue, RedSaturation, GreenHue, GreenSaturation, BlueHue, BlueSaturation)
             // 等待算法实现...
             
-            // TODO: 8. 锐化 (Sharpness)
-            // 等待算法实现...
+            // 8. 锐化 (Sharpness) - 使用专业清晰度调整算法
+            // Sharpness 范围：0-150，映射到清晰度值 0-100
+            // 0 = 不调整，150 = 最大锐化
+            // 移除条件判断，确保总是执行（ApplyClarity 内部会检查）
+            float clarityValue = (Sharpness / 150.0) * 100.0;
+            // 应用锐化（传入当前处理后的颜色）
+            rgb = ApplyClarity(rgb, input.TexCoord, clarityValue);
             
             // TODO: 9. 降噪 (NoiseReduction)
             // 等待算法实现...
@@ -696,7 +829,7 @@ bool ImageAdjustNode::InitializeShaderResources() {
     )";
     
     // 连接所有 shader 代码部分
-    std::string psCodeStr = std::string(psCodePart1) + std::string(psCodePart2) + std::string(psCodePart3);
+    std::string psCodeStr = std::string(psCodePart1) + std::string(psCodePart2) + std::string(psCodePart3) + std::string(psCodePart4);
     const char* psCode = psCodeStr.c_str();
 
     try {
@@ -871,6 +1004,10 @@ void ImageAdjustNode::UpdateConstantBuffer(uint32_t width, uint32_t height) {
             cbData.LumAdjustments2[3] = m_Params.lumMagenta;
     
     cbData.Sharpness = m_Params.sharpness;
+    // 调试输出
+    if (abs(m_Params.sharpness) > 0.1f) {
+        std::cout << "[ImageAdjustNode] Sharpness = " << m_Params.sharpness << std::endl;
+    }
     cbData.NoiseReduction = m_Params.noiseReduction;
     cbData.LensDistortion = m_Params.lensDistortion;
     cbData.ChromaticAberration = m_Params.chromaticAberration;
