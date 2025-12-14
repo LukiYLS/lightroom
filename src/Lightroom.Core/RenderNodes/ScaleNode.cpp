@@ -12,7 +12,7 @@
 namespace LightroomCore {
 
 // Constant buffer 结构体（必须 16 字节对齐）
-struct ScaleConstantBuffer {
+struct __declspec(align(16)) ScaleConstantBuffer {
     float ZoomLevel;      // 用户缩放级别（1.0 = 100%, 2.0 = 200%, 0.5 = 50%）
     float PanX;           // X 平移（归一化坐标）
     float PanY;           // Y 平移（归一化坐标）
@@ -21,6 +21,7 @@ struct ScaleConstantBuffer {
     float InputImageHeight; // 输入图片高度
     float OutputWidth;      // 输出宽度
     float OutputHeight;     // 输出高度
+    float Padding[2];     // 填充到 16 字节边界（8 个 float = 32 字节，需要填充到 32 字节，已经是16的倍数）
 };
 
 ScaleNode::ScaleNode(std::shared_ptr<RenderCore::DynamicRHI> rhi)
@@ -183,6 +184,8 @@ void ScaleNode::UpdateConstantBuffers(uint32_t width, uint32_t height) {
     cbData.InputImageHeight = static_cast<float>(m_InputImageHeight);
     cbData.OutputWidth = static_cast<float>(outputWidth);
     cbData.OutputHeight = static_cast<float>(outputHeight);
+    cbData.Padding[0] = 0.0f;
+    cbData.Padding[1] = 0.0f;
 
     // 使用 RHI 接口更新 constant buffer
     m_CommandContext->RHIUpdateUniformBuffer(m_ConstantBuffer, &cbData);

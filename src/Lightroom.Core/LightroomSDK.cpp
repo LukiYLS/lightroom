@@ -419,9 +419,18 @@ void SetRenderTargetZoom(void* renderTargetHandle, double zoomLevel, double panX
                 
                 // 如果已加载图片，设置输入图片尺寸
                 if (data->bHasImage && data->ImageTexture) {
-                    uint32_t imageWidth, imageHeight;
-                    g_ImageProcessor->GetLastImageSize(imageWidth, imageHeight);
-                    scaleNode->SetInputImageSize(imageWidth, imageHeight);
+                    if (data->bIsVideo) {
+                        // 视频
+                        const LightroomCore::VideoMetadata* metadata = data->VideoProcessor->GetMetadata();
+                        if (metadata) {
+                            scaleNode->SetInputImageSize(metadata->width, metadata->height);
+                        }
+                    } else {
+                        // 图片
+                        uint32_t imageWidth, imageHeight;
+                        g_ImageProcessor->GetLastImageSize(imageWidth, imageHeight);
+                        scaleNode->SetInputImageSize(imageWidth, imageHeight);
+                    }
                 }
             }
             break;

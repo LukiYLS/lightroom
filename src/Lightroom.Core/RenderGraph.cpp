@@ -1,4 +1,5 @@
 ﻿#include "RenderGraph.h"
+#include "VideoProcessing/VideoPerformanceProfiler.h"
 #include <iostream>
 
 namespace LightroomCore {
@@ -55,9 +56,14 @@ bool RenderGraph::Execute(std::shared_ptr<RenderCore::RHITexture2D> inputTexture
         }
 
         // 执行节点
-        if (!m_Nodes[i]->Execute(currentInput, currentOutput, width, height)) {
-            std::cerr << "[RenderGraph] Node " << i << " (" << m_Nodes[i]->GetName() << ") failed" << std::endl;
-            return false;
+        {
+            using namespace LightroomCore;
+            std::string nodeName = std::string("RenderGraph_Node_") + m_Nodes[i]->GetName();
+            ScopedTimer nodeTimer(nodeName);
+            if (!m_Nodes[i]->Execute(currentInput, currentOutput, width, height)) {
+                std::cerr << "[RenderGraph] Node " << i << " (" << m_Nodes[i]->GetName() << ") failed" << std::endl;
+                return false;
+            }
         }
 
         // 下一节点的输入是当前节点的输出
@@ -85,6 +91,7 @@ std::shared_ptr<RenderCore::RHITexture2D> RenderGraph::CreateIntermediateTexture
 }
 
 } // namespace LightroomCore
+
 
 
 

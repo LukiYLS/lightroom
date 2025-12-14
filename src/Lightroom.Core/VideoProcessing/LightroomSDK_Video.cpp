@@ -5,7 +5,9 @@
 #include "../LightroomSDKTypes.h"
 #include "../LightroomSDK_Internal.h"
 #include "../D3D9Interop.h"
+#include "../d3d11rhi/D3D11RHI.h"
 #include "VideoProcessor.h"
+#include "VideoPerformanceProfiler.h"
 #include "../RenderTargetManager.h"
 #include "../RenderGraph.h"
 #include "../RenderNodes/ImageAdjustNode.h"
@@ -232,8 +234,15 @@ bool RenderVideoFrame(void* renderTargetHandle) {
     }
     
     try {
+        using namespace LightroomCore;
+        ScopedTimer totalTimer("RenderVideoFrame_Total");
+        
         // 读取下一帧
-        auto frameTexture = data->VideoProcessor->GetNextFrame();
+        std::shared_ptr<RenderCore::RHITexture2D> frameTexture;
+        {
+            ScopedTimer getFrameTimer("RenderVideoFrame_GetNextFrame");
+            frameTexture = data->VideoProcessor->GetNextFrame();
+        }
         if (!frameTexture) {
             return false;
         }
@@ -254,29 +263,55 @@ bool RenderVideoFrame(void* renderTargetHandle) {
         }
         
         // 执行渲染图
-        if (!data->RenderGraph->Execute(
-                frameTexture,
-                outputTexture,
-                renderTargetInfo->Width,
-                renderTargetInfo->Height)) {
-            return false;
+        {
+            ScopedTimer renderGraphTimer("RenderVideoFrame_RenderGraph");
+            if (!data->RenderGraph->Execute(
+                    frameTexture,
+                    outputTexture,
+                    renderTargetInfo->Width,
+                    renderTargetInfo->Height)) {
+                return false;
+            }
         }
         
         // 刷新命令
-        auto commandContext = g_DynamicRHI->GetDefaultCommandContext();
-        if (commandContext) {
-            commandContext->FlushCommands();
+        {
+            ScopedTimer flushTimer("RenderVideoFrame_FlushCommands");
+            auto commandContext = g_DynamicRHI->GetDefaultCommandContext();
+            if (commandContext) {
+                commandContext->FlushCommands();
+            }
+            
+            // 确保 D3D11 命令已提交到 GPU
+            RenderCore::D3D11DynamicRHI* d3d11RHI = dynamic_cast<RenderCore::D3D11DynamicRHI*>(g_DynamicRHI.get());
+            if (d3d11RHI) {
+                ID3D11DeviceContext* d3d11Context = d3d11RHI->GetDeviceContext();
+                if (d3d11Context) {
+                    d3d11Context->Flush();
+                }
+            }
         }
         
         // 使用 GPU 拷贝从 D3D11 共享纹理拷贝到 D3D9 表面（与 RenderToTarget 中的逻辑一致）
         // 注意：renderTargetInfo 已经在上面定义过了，直接使用
         if (renderTargetInfo && renderTargetInfo->D3D9SharedSurface && renderTargetInfo->D3D9Surface && g_D3D9InteropPtr) {
+            ScopedTimer copyTimer("RenderVideoFrame_D3D9Copy");
             g_D3D9InteropPtr->CopySurface(
                 renderTargetInfo->D3D9SharedSurface,
                 renderTargetInfo->D3D9Surface,
                 renderTargetInfo->Width,
                 renderTargetInfo->Height
             );
+        }
+        
+        // Print statistics every 100 frames
+        static int frameCount = 0;
+        frameCount++;
+        if (frameCount % 100 == 0) {
+            std::cout.flush();  // 确保之前的输出被刷新
+            VideoPerformanceProfiler::GetInstance().PrintStatistics(100);
+            std::cout.flush();  // 确保统计信息被刷新
+            VideoPerformanceProfiler::GetInstance().ClearOldRecords(200);
         }
         
         return true;

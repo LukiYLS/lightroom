@@ -104,6 +104,9 @@
     <ClCompile Include="RenderNodes\FilterNode.cpp">
       <Filter>RenderNodes</Filter>
     </ClCompile>
+    <ClCompile Include="RenderNodes\YUVToRGBNode.cpp">
+      <Filter>RenderNodes</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="LightroomSDK.h" />
@@ -131,6 +134,12 @@
       <Filter>VideoProcessing</Filter>
     </ClInclude>
     <ClInclude Include="VideoProcessing\FFmpegVideoLoader.h">
+      <Filter>VideoProcessing</Filter>
+    </ClInclude>
+    <ClInclude Include="VideoProcessing\FFmpegHardwareVideoLoader.h">
+      <Filter>VideoProcessing</Filter>
+    </ClInclude>
+    <ClInclude Include="VideoProcessing\FFmpegSoftwareVideoLoader.h">
       <Filter>VideoProcessing</Filter>
     </ClInclude>
     <ClInclude Include="VideoProcessing\VideoProcessor.h">
@@ -271,6 +280,9 @@
       <Filter>d3d11rhi</Filter>
     </ClInclude>
     <ClInclude Include="RenderNodes\FilterNode.h">
+      <Filter>RenderNodes</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderNodes\YUVToRGBNode.h">
       <Filter>RenderNodes</Filter>
     </ClInclude>
   </ItemGroup>

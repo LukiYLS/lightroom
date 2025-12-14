@@ -103,6 +103,15 @@ namespace Lightroom.App.Controls
                             VideoControlsBorder.Visibility = Visibility.Visible;
                         }
                         
+                        // 根据视频帧率调整渲染定时器
+                        if (_videoMetadata.frameRate > 0)
+                        {
+                            // 根据视频帧率计算渲染间隔（毫秒）
+                            double frameInterval = 1000.0 / _videoMetadata.frameRate;
+                            _renderTimer.Interval = TimeSpan.FromMilliseconds(frameInterval);
+                            System.Diagnostics.Debug.WriteLine($"[ImageEditorView] Adjusted render timer interval to {frameInterval:F2} ms for {_videoMetadata.frameRate} fps video");
+                        }
+                        
                         // 启动视频更新定时器
                         StartVideoUpdateTimer();
                         
@@ -139,6 +148,9 @@ namespace Lightroom.App.Controls
                         NativeMethods.CloseVideo(_renderTargetHandle);
                         _isVideo = false;
                         _isPlaying = false;
+                        
+                        // 恢复默认渲染定时器间隔（60 FPS）
+                        _renderTimer.Interval = TimeSpan.FromMilliseconds(16);
                         
                         // 隐藏视频控制栏
                         if (VideoControlsBorder != null)
