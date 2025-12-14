@@ -23,6 +23,9 @@ namespace Lightroom.App.Controls
         private uint[] _histogramData = new uint[256 * 4]; // R, G, B, Luminance (每个 256 bins)
         private bool _isInitializing = false;
         private bool _isResizing = false;
+        private NativeMethods.VideoMetadata _videoMetadata;
+        private bool _isSeeking = false; // 是否正在拖拽进度条
+        private DispatcherTimer? _videoUpdateTimer = null; // 用于更新视频进度和时间
 
         public event EventHandler<double>? ZoomChanged;
         
@@ -78,6 +81,13 @@ namespace Lightroom.App.Controls
                         _isPlaying = true; // 自动开始播放
                         System.Diagnostics.Debug.WriteLine($"[ImageEditorView] Successfully loaded video: {absolutePath}");
                         
+                        // 获取视频元数据
+                        if (NativeMethods.GetVideoMetadata(_renderTargetHandle, out _videoMetadata))
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[ImageEditorView] Video metadata: {_videoMetadata.width}x{_videoMetadata.height}, {_videoMetadata.frameRate} fps, {_videoMetadata.totalFrames} frames, {_videoMetadata.duration} us");
+                            UpdateVideoControls();
+                        }
+                        
                         // 立即渲染第一帧（使用 RenderVideoFrame 来解码并渲染第一帧）
                         bool frameRendered = NativeMethods.RenderVideoFrame(_renderTargetHandle);
                         if (!frameRendered)
@@ -87,6 +97,15 @@ namespace Lightroom.App.Controls
                             NativeMethods.RenderToTarget(_renderTargetHandle);
                         }
                         
+                        // 显示视频控制栏
+                        if (VideoControlsBorder != null)
+                        {
+                            VideoControlsBorder.Visibility = Visibility.Visible;
+                        }
+                        
+                        // 启动视频更新定时器
+                        StartVideoUpdateTimer();
+                        
                         // 延迟更新直方图，等待渲染完成
                         Dispatcher.BeginInvoke(new Action(() => {
                             UpdateHistogram();
@@ -95,6 +114,13 @@ namespace Lightroom.App.Controls
                     else
                     {
                         System.Diagnostics.Debug.WriteLine($"[ImageEditorView] Failed to load video: {absolutePath}");
+                        
+                        // 确保视频控制栏隐藏
+                        if (VideoControlsBorder != null)
+                        {
+                            VideoControlsBorder.Visibility = Visibility.Collapsed;
+                        }
+                        
                         System.Windows.MessageBox.Show(
                             $"无法加载视频文件：{absolutePath}\n\n可能的原因：\n1. FFmpeg DLL 文件缺失\n2. 视频文件格式不支持\n3. 视频文件已损坏",
                             "视频加载失败",
@@ -109,9 +135,16 @@ namespace Lightroom.App.Controls
                     // 如果之前是视频，先关闭
                     if (_isVideo)
                     {
+                        StopVideoUpdateTimer();
                         NativeMethods.CloseVideo(_renderTargetHandle);
                         _isVideo = false;
                         _isPlaying = false;
+                        
+                        // 隐藏视频控制栏
+                        if (VideoControlsBorder != null)
+                        {
+                            VideoControlsBorder.Visibility = Visibility.Collapsed;
+                        }
                     }
                     
                     success = NativeMethods.LoadImageToTarget(_renderTargetHandle, absolutePath);
@@ -240,7 +273,7 @@ namespace Lightroom.App.Controls
                 _renderCount++;
                 
                 // 如果是视频且正在播放，渲染下一帧
-                if (_isVideo && _isPlaying)
+                if (_isVideo && _isPlaying && !_isSeeking)
                 {
                     NativeMethods.RenderVideoFrame(_renderTargetHandle);
                 }
@@ -282,6 +315,9 @@ namespace Lightroom.App.Controls
 
         private void CleanupD3DRendering()
         {
+            // 停止视频更新定时器
+            StopVideoUpdateTimer();
+            
             // 停止播放并关闭视频
             if (_isVideo && _renderTargetHandle != IntPtr.Zero)
             {
@@ -409,6 +445,23 @@ namespace Lightroom.App.Controls
                         {
                             _isVideo = savedIsVideo;
                             _isPlaying = savedIsPlaying;
+                            
+                            // 显示视频控制栏
+                            if (VideoControlsBorder != null)
+                            {
+                                VideoControlsBorder.Visibility = Visibility.Visible;
+                            }
+                            
+                            // 重新启动视频更新定时器
+                            StartVideoUpdateTimer();
+                        }
+                        else
+                        {
+                            // 隐藏视频控制栏
+                            if (VideoControlsBorder != null)
+                            {
+                                VideoControlsBorder.Visibility = Visibility.Collapsed;
+                            }
                         }
                         
                         // 恢复缩放级别
@@ -576,6 +629,181 @@ namespace Lightroom.App.Controls
                     Canvas.SetBottom(rect, 0);
                     HistogramCanvas.Children.Add(rect);
                 }
+            }
+        }
+        
+        // 视频控制相关方法
+        private void StartVideoUpdateTimer()
+        {
+            if (_videoUpdateTimer == null)
+            {
+                _videoUpdateTimer = new DispatcherTimer();
+                _videoUpdateTimer.Interval = TimeSpan.FromMilliseconds(100); // 每 100ms 更新一次
+                _videoUpdateTimer.Tick += VideoUpdateTimer_Tick;
+            }
+            _videoUpdateTimer.Start();
+        }
+        
+        private void StopVideoUpdateTimer()
+        {
+            if (_videoUpdateTimer != null)
+            {
+                _videoUpdateTimer.Stop();
+                _videoUpdateTimer = null;
+            }
+        }
+        
+        private void VideoUpdateTimer_Tick(object? sender, EventArgs e)
+        {
+            if (!_isVideo || _renderTargetHandle == IntPtr.Zero || _isSeeking)
+                return;
+            
+            UpdateVideoProgress();
+        }
+        
+        private void UpdateVideoProgress()
+        {
+            if (!_isVideo || _renderTargetHandle == IntPtr.Zero)
+                return;
+            
+            try
+            {
+                long currentTimestamp = NativeMethods.GetCurrentVideoTimestamp(_renderTargetHandle);
+                long currentFrame = NativeMethods.GetCurrentVideoFrame(_renderTargetHandle);
+                
+                if (_videoMetadata.duration > 0 && VideoProgressSlider != null)
+                {
+                    // 更新进度条（0-100）
+                    double progress = (double)currentTimestamp / _videoMetadata.duration * 100.0;
+                    progress = Math.Max(0, Math.Min(100, progress));
+                    
+                    // 只有在不是用户拖拽时才更新进度条
+                    if (!_isSeeking)
+                    {
+                        VideoProgressSlider.Value = progress;
+                    }
+                    
+                    // 更新时间显示
+                    UpdateTimeDisplay(currentTimestamp, _videoMetadata.duration);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ImageEditorView] Error updating video progress: {ex.Message}");
+            }
+        }
+        
+        private void UpdateTimeDisplay(long currentTimestamp, long totalDuration)
+        {
+            if (CurrentTimeText == null || TotalTimeText == null)
+                return;
+            
+            // 转换微秒到秒
+            double currentSeconds = currentTimestamp / 1_000_000.0;
+            double totalSeconds = totalDuration / 1_000_000.0;
+            
+            CurrentTimeText.Text = FormatTime(currentSeconds);
+            TotalTimeText.Text = "/ " + FormatTime(totalSeconds);
+        }
+        
+        private string FormatTime(double seconds)
+        {
+            int totalSeconds = (int)Math.Floor(seconds);
+            int minutes = totalSeconds / 60;
+            int secs = totalSeconds % 60;
+            
+            return $"{minutes:D2}:{secs:D2}";
+        }
+        
+        private void UpdateVideoControls()
+        {
+            if (!_isVideo)
+                return;
+            
+            // 设置进度条最大值
+            if (VideoProgressSlider != null)
+            {
+                VideoProgressSlider.Maximum = 100;
+                VideoProgressSlider.Value = 0;
+            }
+            
+            // 更新播放/暂停按钮图标
+            UpdatePlayPauseButton();
+        }
+        
+        private void UpdatePlayPauseButton()
+        {
+            if (PlayPauseIcon == null)
+                return;
+            
+            PlayPauseIcon.Text = _isPlaying ? "⏸" : "▶";
+        }
+        
+        private void PlayPauseButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (!_isVideo || _renderTargetHandle == IntPtr.Zero)
+                return;
+            
+            _isPlaying = !_isPlaying;
+            UpdatePlayPauseButton();
+            
+            System.Diagnostics.Debug.WriteLine($"[ImageEditorView] Video playback: {(_isPlaying ? "Playing" : "Paused")}");
+        }
+        
+        private void VideoProgressSlider_PreviewMouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            _isSeeking = true;
+        }
+        
+        private void VideoProgressSlider_PreviewMouseUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (!_isVideo || _renderTargetHandle == IntPtr.Zero || VideoProgressSlider == null)
+            {
+                _isSeeking = false;
+                return;
+            }
+            
+            try
+            {
+                // 计算目标时间戳
+                double progress = VideoProgressSlider.Value / 100.0;
+                long targetTimestamp = (long)(_videoMetadata.duration * progress);
+                
+                // 跳转到指定时间
+                bool success = NativeMethods.SeekVideo(_renderTargetHandle, targetTimestamp);
+                if (success)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[ImageEditorView] Seeked to {targetTimestamp} us ({progress * 100:F1}%)");
+                    
+                    // 立即渲染当前帧
+                    NativeMethods.RenderVideoFrame(_renderTargetHandle);
+                    
+                    // 更新显示
+                    UpdateVideoProgress();
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"[ImageEditorView] Failed to seek to {targetTimestamp} us");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ImageEditorView] Error seeking video: {ex.Message}");
+            }
+            finally
+            {
+                _isSeeking = false;
+            }
+        }
+        
+        private void VideoProgressSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            // 当用户拖拽进度条时，实时更新时间显示（但不实际跳转）
+            if (_isSeeking && _isVideo && _videoMetadata.duration > 0)
+            {
+                double progress = e.NewValue / 100.0;
+                long targetTimestamp = (long)(_videoMetadata.duration * progress);
+                UpdateTimeDisplay(targetTimestamp, _videoMetadata.duration);
             }
         }
     }

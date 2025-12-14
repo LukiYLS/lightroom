@@ -57,6 +57,82 @@
                         </Grid>
                     </Border>
                     
+                    <!-- Video controls (only visible when video is loaded) -->
+                    <Border x:Name="VideoControlsBorder"
+                           HorizontalAlignment="Stretch"
+                           VerticalAlignment="Bottom"
+                           Margin="0,0,0,0"
+                           Background="#E0000000"
+                           Padding="15,10"
+                           BorderThickness="0,1,0,0"
+                           BorderBrush="#40FFFFFF"
+                           Visibility="Collapsed">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <!-- Play/Pause Button -->
+                            <Button x:Name="PlayPauseButton"
+                                   Grid.Column="0"
+                                   Width="40" Height="40"
+                                   Background="Transparent"
+                                   Foreground="White"
+                                   BorderThickness="0"
+                                   Cursor="Hand"
+                                   Click="PlayPauseButton_Click"
+                                   Margin="0,0,15,0">
+                                <TextBlock x:Name="PlayPauseIcon"
+                                          Text="▶"
+                                          FontSize="20"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                            </Button>
+                            
+                            <!-- Progress bar and time -->
+                            <StackPanel Grid.Column="1"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,15,0">
+                                <!-- Progress bar -->
+                                <Slider x:Name="VideoProgressSlider"
+                                       Minimum="0"
+                                       Maximum="100"
+                                       Value="0"
+                                       Height="20"
+                                       Margin="0,0,0,5"
+                                       Cursor="Hand"
+                                       ValueChanged="VideoProgressSlider_ValueChanged"
+                                       PreviewMouseDown="VideoProgressSlider_PreviewMouseDown"
+                                       PreviewMouseUp="VideoProgressSlider_PreviewMouseUp"/>
+                                
+                                <!-- Time display -->
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="CurrentTimeText"
+                                              Grid.Column="0"
+                                              Text="00:00"
+                                              Foreground="#CCCCCC"
+                                              FontSize="12"
+                                              VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="TotalTimeText"
+                                              Grid.Column="1"
+                                              Text="/ 00:00"
+                                              Foreground="#888888"
+                                              FontSize="12"
+                                              VerticalAlignment="Center"/>
+                                </Grid>
+                            </StackPanel>
+                            
+                            <!-- Empty space for alignment -->
+                            <Grid Grid.Column="2" Width="0"/>
+                        </Grid>
+                    </Border>
+                    
                     <!-- Zoom controls -->
                     <StackPanel HorizontalAlignment="Right" 
                                VerticalAlignment="Bottom" 
