@@ -68,6 +68,14 @@ std::shared_ptr<RenderCore::RHITexture2D> VideoProcessor::GetCurrentFrame() {
     }
     
     int64_t currentFrame = m_VideoLoader->GetCurrentFrameIndex();
+    
+    // 如果当前帧索引是 0 或 -1（初始状态），直接读取下一帧（第一帧）
+    // 这样可以避免 seek 操作，确保能正确获取第一帧
+    if (currentFrame <= 0) {
+        return m_VideoLoader->ReadNextFrame(m_RHI);
+    }
+    
+    // 否则，读取指定帧
     return m_VideoLoader->ReadFrame(currentFrame, m_RHI);
 }
 
