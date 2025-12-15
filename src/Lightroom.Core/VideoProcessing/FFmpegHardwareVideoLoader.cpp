@@ -59,7 +59,6 @@ namespace LightroomCore {
         if (!s_FFmpegInitialized) {
             avformat_network_init();
             s_FFmpegInitialized = true;
-            std::cout << "[FFmpegHardwareVideoLoader] FFmpeg initialized" << std::endl;
         }
     }
 
@@ -80,7 +79,6 @@ namespace LightroomCore {
         // Convert wide char path to UTF-8
         int pathLen = WideCharToMultiByte(CP_UTF8, 0, filePath.c_str(), -1, nullptr, 0, nullptr, nullptr);
         if (pathLen <= 0) {
-            std::cerr << "[FFmpegHardwareVideoLoader] Failed to convert path to UTF-8" << std::endl;
             return false;
         }
 
@@ -90,7 +88,6 @@ namespace LightroomCore {
         // Open input file
         m_FormatContext = avformat_alloc_context();
         if (avformat_open_input(&m_FormatContext, utf8Path.data(), nullptr, nullptr) < 0) {
-            std::cerr << "[FFmpegHardwareVideoLoader] Failed to open input file" << std::endl;
             avformat_free_context(m_FormatContext);
             m_FormatContext = nullptr;
             return false;
@@ -113,7 +110,6 @@ namespace LightroomCore {
         }
 
         if (m_VideoStreamIndex == -1) {
-            std::cerr << "[FFmpegHardwareVideoLoader] No video stream found" << std::endl;
             Close();
             return false;
         }
@@ -122,8 +118,6 @@ namespace LightroomCore {
         AVCodecParameters* codecpar = m_FormatContext->streams[m_VideoStreamIndex]->codecpar;
         const AVCodec* codec = avcodec_find_decoder(codecpar->codec_id);
         if (!codec) {
-            std::cerr << "[FFmpegHardwareVideoLoader] Codec not found for codec_id: " << codecpar->codec_id << std::endl;
-            std::cerr << "[FFmpegHardwareVideoLoader] This codec may not be compiled in FFmpeg" << std::endl;
             Close();
             return false;
         }
@@ -144,9 +138,6 @@ namespace LightroomCore {
         }
 
         if (!supportsHardware) {
-            std::cout << "[FFmpegHardwareVideoLoader] Codec '" << codec->name 
-                      << "' (codec_id: " << codecpar->codec_id 
-                      << ") does not support D3D11VA hardware decoding, will use software decoder" << std::endl;
             Close();
             return false;
         }
@@ -154,14 +145,12 @@ namespace LightroomCore {
         // Allocate codec context
         m_CodecContext = avcodec_alloc_context3(codec);
         if (!m_CodecContext) {
-            std::cerr << "[FFmpegHardwareVideoLoader] Failed to allocate codec context" << std::endl;
             Close();
             return false;
         }
 
         // Copy codec parameters
         if (avcodec_parameters_to_context(m_CodecContext, codecpar) < 0) {
-            std::cerr << "[FFmpegHardwareVideoLoader] Failed to copy codec parameters" << std::endl;
             Close();
             return false;
         }
@@ -170,7 +159,6 @@ namespace LightroomCore {
         m_Frame = av_frame_alloc();
         m_SoftwareFrame = av_frame_alloc();
         if (!m_Frame || !m_SoftwareFrame) {
-            std::cerr << "[FFmpegHardwareVideoLoader] Failed to allocate frames" << std::endl;
             Close();
             return false;
         }
@@ -191,8 +179,6 @@ namespace LightroomCore {
         m_CurrentFrameIndex = 0;
         m_IsOpen = true;
 
-        std::cout << "[FFmpegHardwareVideoLoader] Video opened (hardware decoding will be initialized on first frame): "
-            << m_Metadata.width << "x" << m_Metadata.height << " @ " << m_Metadata.frameRate << " fps" << std::endl;
 
         return true;
     }
@@ -433,82 +419,6 @@ namespace LightroomCore {
         return false;
     }
 
-    // -------------------------------------------------------------------------
-    // 核心函数 1：管理中转纹理的生命周期 (只在初始化或Resize时调用)
-    // -------------------------------------------------------------------------
-    bool FFmpegHardwareVideoLoader::EnsureStagingResources(ID3D11Device* device, uint32_t width, uint32_t height)
-    {
-        // 如果资源已存在且尺寸未变，直接复用，不做任何操作
-        if (m_StagingTexture && m_CachedStagingWidth == width && m_CachedStagingHeight == height) {
-            return true;
-        }
-
-        // 尺寸变更或未初始化：先清理旧资源
-        m_StagingTexture.Reset();
-        m_StagingYSRV.Reset();
-        m_StagingUVSRV.Reset();
-
-        // 1. 创建单层 NV12 纹理
-        // 注意：格式必须与源纹理数组完全匹配，否则 CopySubresourceRegion 会失败
-        // 这里先使用 DXGI_FORMAT_NV12，实际格式会在 ReadNextFrame 中验证
-        D3D11_TEXTURE2D_DESC desc = {};
-        desc.Width = width;
-        desc.Height = height;
-        desc.MipLevels = 1;
-        desc.ArraySize = 1;              // 【关键】这里是 1，不是数组
-        desc.Format = DXGI_FORMAT_NV12;  // 默认使用 NV12（应该与源纹理数组格式匹配）
-        desc.SampleDesc.Count = 1;
-        desc.SampleDesc.Quality = 0;
-        desc.Usage = D3D11_USAGE_DEFAULT;
-        desc.BindFlags = D3D11_BIND_SHADER_RESOURCE; // 必须能作为 SRV 绑定
-        desc.CPUAccessFlags = 0;
-        desc.MiscFlags = 0;
-
-        HRESULT hr = device->CreateTexture2D(&desc, nullptr, m_StagingTexture.ReleaseAndGetAddressOf());
-        if (FAILED(hr)) {
-            std::cerr << "[FFmpegHardwareVideoLoader] Failed to create staging texture: HRESULT=0x" 
-                      << std::hex << hr << std::dec << std::endl;
-            return false;
-        }
-
-        // 2. 创建 Y 平面视图 (R8_UNORM) - Dimension 是 TEXTURE2D
-        D3D11_SHADER_RESOURCE_VIEW_DESC srvDescY = {};
-        srvDescY.Format = DXGI_FORMAT_R8_UNORM;
-        srvDescY.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-        srvDescY.Texture2D.MostDetailedMip = 0;
-        srvDescY.Texture2D.MipLevels = 1;
-
-        hr = device->CreateShaderResourceView(m_StagingTexture.Get(), &srvDescY, m_StagingYSRV.ReleaseAndGetAddressOf());
-        if (FAILED(hr)) {
-            std::cerr << "[FFmpegHardwareVideoLoader] Failed to create Y SRV: HRESULT=0x" 
-                      << std::hex << hr << std::dec << std::endl;
-            return false;
-        }
-
-        // 3. 创建 UV 平面视图 (R8G8_UNORM) - Dimension 是 TEXTURE2D
-        D3D11_SHADER_RESOURCE_VIEW_DESC srvDescUV = {};
-        srvDescUV.Format = DXGI_FORMAT_R8G8_UNORM;
-        srvDescUV.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-        srvDescUV.Texture2D.MostDetailedMip = 0;
-        srvDescUV.Texture2D.MipLevels = 1;
-
-        hr = device->CreateShaderResourceView(m_StagingTexture.Get(), &srvDescUV, m_StagingUVSRV.ReleaseAndGetAddressOf());
-        if (FAILED(hr)) {
-            std::cerr << "[FFmpegHardwareVideoLoader] Failed to create UV SRV: HRESULT=0x" 
-                      << std::hex << hr << std::dec << std::endl;
-            m_StagingYSRV.Reset();  // Clean up Y SRV if UV fails
-            return false;
-        }
-
-        // 更新缓存记录
-        m_CachedStagingWidth = width;
-        m_CachedStagingHeight = height;
-        
-        std::cout << "[FFmpegHardwareVideoLoader] (Re)Created staging resources: " << width << "x" << height << std::endl;
-        return true;
-    }
-
-
     std::shared_ptr<RenderCore::RHITexture2D> FFmpegHardwareVideoLoader::GetHardwareFrameTexture(
         std::shared_ptr<RenderCore::DynamicRHI> rhi) {
         if (!m_Frame || m_Frame->format != AV_PIX_FMT_D3D11) {
@@ -579,7 +489,7 @@ namespace LightroomCore {
 
             ID3D11Device* device = d3d11RHI->GetDevice();
             ID3D11DeviceContext* context = d3d11RHI->GetDeviceContext();
-
+            //ID3D11Texture2D* srcTextureArray = (ID3D11Texture2D*)(uintptr_t)m_Frame->data[0];
             // 1. 使用 av_hwframe_transfer_data 将硬件帧转换为软件帧（NV12格式）
             {
                 ScopedTimer timer("HWFrameTransfer", m_CurrentFrameIndex);
@@ -881,5 +791,9 @@ namespace LightroomCore {
     }
 
 } // namespace LightroomCore
+
+
+
+
 
 

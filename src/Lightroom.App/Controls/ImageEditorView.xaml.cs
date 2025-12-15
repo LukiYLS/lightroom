@@ -504,9 +504,10 @@ namespace Lightroom.App.Controls
                 return;
 
             // 从 SDK 获取真实的直方图数据
-            if (_currentImagePath == null)
+            // 对于图片和视频都应该显示直方图
+            if (_currentImagePath == null && !_isVideo)
             {
-                // 没有图片时，显示空直方图
+                // 没有图片且不是视频时，显示空直方图
                 HistogramCanvas.Children.Clear();
                 return;
             }

@@ -62,9 +62,6 @@ private:
     bool InitializeHardwareDecoding(std::shared_ptr<RenderCore::DynamicRHI> rhi);
     void CleanupHardwareDecoding();
     
-    // Manage staging texture resources (single-layer NV12 texture for copying from array)
-    bool EnsureStagingResources(ID3D11Device* device, uint32_t width, uint32_t height);
-    
     static void InitializeFFmpeg();
     static bool s_FFmpegInitialized;
     

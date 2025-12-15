@@ -22,18 +22,15 @@ bool VideoProcessor::OpenVideo(const std::wstring& filePath) {
     }
     
     if (!m_VideoLoader->Open(filePath)) {
-        std::cerr << "[VideoProcessor] Failed to open video: " << std::endl;
         return false;
     }
     
     if (!m_VideoLoader->GetMetadata(m_Metadata)) {
-        std::cerr << "[VideoProcessor] Failed to get video metadata" << std::endl;
         m_VideoLoader->Close();
         return false;
     }
     
     m_IsOpen = true;
-    std::cout << "[VideoProcessor] Video opened successfully" << std::endl;
     return true;
 }
 

@@ -23,7 +23,6 @@ bool D3D9Interop::Initialize() {
     // 创建 D3D9Ex
     HRESULT hr = Direct3DCreate9Ex(D3D_SDK_VERSION, &m_D3D9Ex);
     if (FAILED(hr) || !m_D3D9Ex) {
-        std::cerr << "[D3D9Interop] Failed to create D3D9Ex: 0x" << std::hex << hr << std::endl;
         return false;
     }
 
@@ -48,13 +47,11 @@ bool D3D9Interop::Initialize() {
     );
 
     if (FAILED(hr)) {
-        std::cerr << "[D3D9Interop] Failed to create D3D9Ex device: 0x" << std::hex << hr << std::endl;
         m_D3D9Ex->Release();
         m_D3D9Ex = nullptr;
         return false;
     }
 
-    std::cout << "[D3D9Interop] D3D9Ex device created successfully" << std::endl;
     return true;
 }
 
@@ -88,14 +85,12 @@ bool D3D9Interop::CreateSharedTextureFromD3D11(HANDLE d3d11SharedHandle, uint32_
     );
 
     if (FAILED(hr)) {
-        std::cerr << "[D3D9Interop] Failed to create shared texture from D3D11 handle: 0x" << std::hex << hr << std::endl;
         return false;
     }
 
     // 获取纹理的表面
     hr = (*outTexture)->GetSurfaceLevel(0, outSurface);
     if (FAILED(hr)) {
-        std::cerr << "[D3D9Interop] Failed to get surface level: 0x" << std::hex << hr << std::endl;
         (*outTexture)->Release();
         *outTexture = nullptr;
         return false;
@@ -153,7 +148,6 @@ bool D3D9Interop::CreateRenderTargetSurface(uint32_t width, uint32_t height, IDi
         }
 
         if (FAILED(hr)) {
-            std::cerr << "[D3D9Interop] Failed to create render target surface: 0x" << std::hex << hr << std::endl;
             return false;
         }
     }
@@ -179,7 +173,6 @@ bool D3D9Interop::CopySurface(IDirect3DSurface9* srcSurface, IDirect3DSurface9* 
     );
 
     if (FAILED(hr)) {
-        std::cerr << "[D3D9Interop] StretchRect failed: 0x" << std::hex << hr << std::endl;
         return false;
     }
 
@@ -189,6 +182,10 @@ bool D3D9Interop::CopySurface(IDirect3DSurface9* srcSurface, IDirect3DSurface9* 
 }
 
 } // namespace LightroomCore
+
+
+
+
 
 
 

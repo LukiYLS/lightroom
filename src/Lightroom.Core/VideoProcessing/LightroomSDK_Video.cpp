@@ -32,13 +32,11 @@ extern LightroomCore::D3D9Interop* g_D3D9InteropPtr;
 
 bool OpenVideo(void* renderTargetHandle, const char* videoPath) {
     if (!renderTargetHandle || !videoPath || !g_DynamicRHI) {
-        std::cerr << "[SDK] Invalid parameters for OpenVideo" << std::endl;
         return false;
     }
     
     auto it = g_RenderTargetData.find(renderTargetHandle);
     if (it == g_RenderTargetData.end()) {
-        std::cerr << "[SDK] Invalid render target handle" << std::endl;
         return false;
     }
     
@@ -59,7 +57,6 @@ bool OpenVideo(void* renderTargetHandle, const char* videoPath) {
         // 转换路径
         int pathLen = MultiByteToWideChar(CP_UTF8, 0, videoPath, -1, nullptr, 0);
         if (pathLen <= 0) {
-            std::cerr << "[SDK] Failed to convert video path to wide string" << std::endl;
             return false;
         }
         
@@ -68,7 +65,6 @@ bool OpenVideo(void* renderTargetHandle, const char* videoPath) {
         
         // 打开视频
         if (!data->VideoProcessor->OpenVideo(wVideoPath)) {
-            std::cerr << "[SDK] Failed to open video: " << videoPath << std::endl;
             data->VideoProcessor.reset();
             return false;
         }
@@ -76,7 +72,6 @@ bool OpenVideo(void* renderTargetHandle, const char* videoPath) {
         // 获取视频元数据并设置渲染图
         const LightroomCore::VideoMetadata* metadata = data->VideoProcessor->GetMetadata();
         if (!metadata) {
-            std::cerr << "[SDK] Failed to get video metadata" << std::endl;
             data->VideoProcessor->CloseVideo();
             data->VideoProcessor.reset();
             return false;
@@ -102,13 +97,9 @@ bool OpenVideo(void* renderTargetHandle, const char* videoPath) {
         data->bHasImage = true;
         data->ImageFormat = LightroomCore::ImageFormat::Unknown; // 视频不使用 ImageFormat
         
-        std::cout << "[SDK] Video opened: " << metadata->width << "x" << metadata->height 
-                  << ", " << metadata->frameRate << " fps, " << metadata->totalFrames << " frames" << std::endl;
-        
         return true;
     }
     catch (const std::exception& e) {
-        std::cerr << "[SDK] Exception opening video: " << e.what() << std::endl;
         return false;
     }
 }
@@ -129,7 +120,6 @@ void CloseVideo(void* renderTargetHandle) {
         data->VideoProcessor.reset();
         data->bIsVideo = false;
         data->bHasImage = false;
-        std::cout << "[SDK] Video closed" << std::endl;
     }
 }
 
@@ -308,16 +298,13 @@ bool RenderVideoFrame(void* renderTargetHandle) {
         static int frameCount = 0;
         frameCount++;
         if (frameCount % 100 == 0) {
-            std::cout.flush();  // 确保之前的输出被刷新
             VideoPerformanceProfiler::GetInstance().PrintStatistics(100);
-            std::cout.flush();  // 确保统计信息被刷新
             VideoPerformanceProfiler::GetInstance().ClearOldRecords(200);
         }
         
         return true;
     }
     catch (const std::exception& e) {
-        std::cerr << "[SDK] Exception rendering video frame: " << e.what() << std::endl;
         return false;
     }
 }

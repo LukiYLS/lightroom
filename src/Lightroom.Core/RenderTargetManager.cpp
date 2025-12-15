@@ -24,7 +24,6 @@ RenderTargetManager::~RenderTargetManager() {
 
 void* RenderTargetManager::CreateRenderTarget(uint32_t width, uint32_t height) {
     if (!m_RHI || !m_D3D9Interop || !m_D3D9Interop->IsInitialized()) {
-        std::cerr << "[RenderTargetManager] RHI or D3D9Interop not initialized" << std::endl;
         return nullptr;
     }
 
@@ -38,14 +37,12 @@ void* RenderTargetManager::CreateRenderTarget(uint32_t width, uint32_t height) {
         // 这里需要访问底层 D3D11 实现来设置共享标志
         RenderCore::D3D11DynamicRHI* d3d11RHI = dynamic_cast<RenderCore::D3D11DynamicRHI*>(m_RHI.get());
         if (!d3d11RHI) {
-            std::cerr << "[RenderTargetManager] Failed to cast to D3D11DynamicRHI" << std::endl;
             return nullptr;
         }
 
         // 获取底层 D3D11 设备（用于创建共享纹理）
         ID3D11Device* d3d11Device = d3d11RHI->GetDevice();
         if (!d3d11Device) {
-            std::cerr << "[RenderTargetManager] Failed to get D3D11 device" << std::endl;
             return nullptr;
         }
 
@@ -65,14 +62,12 @@ void* RenderTargetManager::CreateRenderTarget(uint32_t width, uint32_t height) {
 
         HRESULT hr = d3d11Device->CreateTexture2D(&desc, nullptr, info->D3D11SharedTexture.GetAddressOf());
         if (FAILED(hr)) {
-            std::cerr << "[RenderTargetManager] Failed to create D3D11 shared texture: 0x" << std::hex << hr << std::endl;
             return nullptr;
         }
 
         // 创建共享纹理的 RTV
         hr = d3d11Device->CreateRenderTargetView(info->D3D11SharedTexture.Get(), nullptr, info->D3D11SharedRTV.GetAddressOf());
         if (FAILED(hr)) {
-            std::cerr << "[RenderTargetManager] Failed to create D3D11 shared RTV: 0x" << std::hex << hr << std::endl;
             return nullptr;
         }
 
@@ -80,13 +75,11 @@ void* RenderTargetManager::CreateRenderTarget(uint32_t width, uint32_t height) {
         Microsoft::WRL::ComPtr<IDXGIResource> dxgiResource;
         hr = info->D3D11SharedTexture.As(&dxgiResource);
         if (FAILED(hr)) {
-            std::cerr << "[RenderTargetManager] Failed to query IDXGIResource: 0x" << std::hex << hr << std::endl;
             return nullptr;
         }
 
         hr = dxgiResource->GetSharedHandle(&info->D3D11SharedHandle);
         if (FAILED(hr) || !info->D3D11SharedHandle) {
-            std::cerr << "[RenderTargetManager] Failed to get D3D11 shared handle: 0x" << std::hex << hr << std::endl;
             return nullptr;
         }
 
@@ -96,7 +89,6 @@ void* RenderTargetManager::CreateRenderTarget(uint32_t width, uint32_t height) {
         if (!d3d11RenderTarget->CreateFromExistingTexture(
                 info->D3D11SharedTexture.Get(),
                 RenderCore::EPixelFormat::PF_B8G8R8A8)) {
-            std::cerr << "[RenderTargetManager] Failed to create RHI render target from shared texture" << std::endl;
             delete d3d11RenderTarget;
             return nullptr;
         }
@@ -107,7 +99,6 @@ void* RenderTargetManager::CreateRenderTarget(uint32_t width, uint32_t height) {
         // 从 RHIRenderTarget 获取纹理
         info->RHITexture = info->RHIRenderTarget->GetTex();
         if (!info->RHITexture) {
-            std::cerr << "[RenderTargetManager] Failed to get RHI texture from render target" << std::endl;
             return nullptr;
         }
 
@@ -115,23 +106,19 @@ void* RenderTargetManager::CreateRenderTarget(uint32_t width, uint32_t height) {
         if (!m_D3D9Interop->CreateSharedTextureFromD3D11(
                 info->D3D11SharedHandle, width, height,
                 &info->D3D9SharedTexture, &info->D3D9SharedSurface)) {
-            std::cerr << "[RenderTargetManager] Failed to create D3D9 shared texture" << std::endl;
             return nullptr;
         }
 
         // 3. 创建用于 WPF D3DImage 的表面
         if (!m_D3D9Interop->CreateRenderTargetSurface(width, height, &info->D3D9Surface)) {
-            std::cerr << "[RenderTargetManager] Failed to create D3D9 render target surface" << std::endl;
             return nullptr;
         }
 
         void* handle = info.get();
         m_RenderTargets[handle] = std::move(info);
-        std::cout << "[RenderTargetManager] Created render target: " << width << "x" << height << std::endl;
         return handle;
     }
     catch (const std::exception& e) {
-        std::cerr << "[RenderTargetManager] Exception: " << e.what() << std::endl;
         return nullptr;
     }
 }

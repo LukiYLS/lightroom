@@ -49,19 +49,15 @@ LightroomCore::RenderTargetManager* g_RenderTargetManager = nullptr;  // 视频 
 
 bool InitSDK() {
     try {
-        std::cout << "[SDK] Initializing Lightroom Core SDK..." << std::endl;
-        
         // 0. 初始化 COM（WIC 需要）
         HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
         if (FAILED(hr) && hr != RPC_E_CHANGED_MODE) {
-            std::cerr << "[SDK] Failed to initialize COM: 0x" << std::hex << hr << std::endl;
             return false;
         }
         
         // 1. 创建 D3D11 RHI
         g_DynamicRHI = PlatformCreateDynamicRHI(RHIAPIType::E_D3D11);
         if (!g_DynamicRHI) {
-            std::cerr << "[SDK] Failed to create D3D11 RHI" << std::endl;
             return false;
         }
         g_DynamicRHI->Init();
@@ -70,7 +66,6 @@ bool InitSDK() {
         g_D3D9Interop = std::make_unique<LightroomCore::D3D9Interop>();
         g_D3D9InteropPtr = g_D3D9Interop.get();  // 设置指针供视频 API 使用
         if (!g_D3D9Interop->Initialize()) {
-            std::cerr << "[SDK] Failed to initialize D3D9 interop" << std::endl;
             return false;
         }
         
@@ -82,17 +77,14 @@ bool InitSDK() {
         g_RenderTargetManager = g_RenderTargetManagerPtr.get();
         // 注意：renderTargetManager 的生命周期由 g_ImageProcessor 管理，这里只是保存指针
         
-        std::cout << "[SDK] SDK Initialized Successfully" << std::endl;
         return true;
     }
     catch (const std::exception& e) {
-        std::cerr << "[SDK] Exception during initialization: " << e.what() << std::endl;
         return false;
     }
 }
 
 void ShutdownSDK() {
-    std::cout << "[SDK] Shutting down..." << std::endl;
     g_D3D9InteropPtr = nullptr;  // 清除指针
     
     // 清理所有渲染目标数据
@@ -126,7 +118,6 @@ int GetSDKVersion() {
 
 void* CreateRenderTarget(uint32_t width, uint32_t height) {
     if (!g_RenderTargetManager) {
-        std::cerr << "[SDK] RenderTargetManager not initialized" << std::endl;
         return nullptr;
     }
     
@@ -225,15 +216,11 @@ bool LoadImageToTarget(void* renderTargetHandle, const char* imagePath) {
             scaleNode->SetInputImageSize(imageWidth, imageHeight);
             data->RenderGraph->AddNode(scaleNode);
             
-            std::cout << "[SDK] Image loaded: " << imageWidth << "x" << imageHeight 
-                      << ", Format: " << (data->ImageFormat == LightroomCore::ImageFormat::RAW ? "RAW" : "Standard")
-                      << ", Nodes: ImageAdjust+Scale" << std::endl;
         }
         
         return true;
     }
     catch (const std::exception& e) {
-        std::cerr << "[SDK] Exception loading image: " << e.what() << std::endl;
         return false;
     }
 }
@@ -297,8 +284,6 @@ void RenderToTarget(void* renderTargetHandle) {
                         }
                     }
                 }
-            } else {
-                std::cerr << "[SDK] RenderToTarget: Failed to get video frame" << std::endl;
             }
             
             // 视频渲染后也需要复制到 D3D9 表面（与图片渲染逻辑一致）
@@ -310,7 +295,6 @@ void RenderToTarget(void* renderTargetHandle) {
             // 获取输出纹理（从 RenderTargetManager）
             auto outputTexture = g_RenderTargetManager->GetRHITexture(renderTargetHandle);
             if (!outputTexture) {
-                std::cerr << "[SDK] Failed to get output texture from render target" << std::endl;
                 return;
             }
             
@@ -320,7 +304,6 @@ void RenderToTarget(void* renderTargetHandle) {
                     outputTexture,       // 输出：渲染目标纹理
                     renderTargetInfo->Width,
                     renderTargetInfo->Height)) {
-                std::cerr << "[SDK] Failed to execute render graph" << std::endl;
                 return;
             }
             
@@ -378,7 +361,6 @@ void RenderToTarget(void* renderTargetHandle) {
         }
     }
     catch (const std::exception& e) {
-        std::cerr << "[SDK] Exception rendering to target: " << e.what() << std::endl;
     }
 }
 
@@ -388,9 +370,7 @@ void ResizeRenderTarget(void* renderTargetHandle, uint32_t width, uint32_t heigh
     }
     
     // 调整渲染目标大小
-    if (!g_RenderTargetManager->ResizeRenderTarget(renderTargetHandle, width, height)) {
-        std::cerr << "[SDK] Failed to resize render target" << std::endl;
-    }
+    g_RenderTargetManager->ResizeRenderTarget(renderTargetHandle, width, height);
 }
 
 void SetRenderTargetZoom(void* renderTargetHandle, double zoomLevel, double panX, double panY) {
@@ -585,12 +565,18 @@ bool GetHistogramData(void* renderTargetHandle, uint32_t* outHistogram) {
     }
     
     auto& data = it->second;
-    if (!data || !data->bHasImage || !data->ImageTexture) {
+    if (!data) {
+        return false;
+    }
+    
+    // 检查是否有图片或视频内容（用于直方图计算）
+    // 对于视频，bIsVideo为true；对于图片，bHasImage为true
+    if (!data->bHasImage && !data->bIsVideo) {
         return false;
     }
     
     try {
-        // 获取渲染后的输出纹理
+        // 获取渲染后的输出纹理（这是实际显示的内容，应该用于直方图计算）
         auto* renderTargetInfo = g_RenderTargetManager->GetRenderTargetInfo(renderTargetHandle);
         if (!renderTargetInfo || !renderTargetInfo->RHIRenderTarget) {
             return false;
@@ -614,12 +600,28 @@ bool GetHistogramData(void* renderTargetHandle, uint32_t* outHistogram) {
         
         ID3D11Texture2D* nativeTex = d3d11Texture->GetNativeTex();
         if (!nativeTex) {
-            return false;
+            // 尝试直接从RenderTargetInfo获取D3D11SharedTexture
+            auto* renderTargetInfo = g_RenderTargetManager->GetRenderTargetInfo(renderTargetHandle);
+            if (renderTargetInfo && renderTargetInfo->D3D11SharedTexture) {
+                nativeTex = renderTargetInfo->D3D11SharedTexture.Get();
+            } else {
+                return false;
+            }
         }
         
         // 获取纹理描述
         D3D11_TEXTURE2D_DESC texDesc;
         nativeTex->GetDesc(&texDesc);
+        
+        // 检查纹理格式，必须是BGRA格式（4字节每像素）
+        if (texDesc.Format != DXGI_FORMAT_B8G8R8A8_UNORM && texDesc.Format != DXGI_FORMAT_B8G8R8A8_TYPELESS) {
+            return false;
+        }
+        
+        // 确保纹理尺寸有效
+        if (texDesc.Width == 0 || texDesc.Height == 0) {
+            return false;
+        }
         
         // 创建 staging texture 用于读取数据
         ID3D11Device* device = d3d11RHI->GetDevice();
@@ -630,20 +632,28 @@ bool GetHistogramData(void* renderTargetHandle, uint32_t* outHistogram) {
         stagingDesc.BindFlags = 0;
         stagingDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
         stagingDesc.MiscFlags = 0;
+        stagingDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;  // 确保staging texture是BGRA格式
         
         Microsoft::WRL::ComPtr<ID3D11Texture2D> stagingTexture;
         HRESULT hr = device->CreateTexture2D(&stagingDesc, nullptr, stagingTexture.GetAddressOf());
         if (FAILED(hr)) {
+            std::cerr << "[SDK] GetHistogramData: Failed to create staging texture: 0x" 
+                      << std::hex << hr << std::dec << std::endl;
             return false;
         }
         
         // 从 GPU 拷贝到 staging texture
         context->CopyResource(stagingTexture.Get(), nativeTex);
         
+        // 确保GPU命令执行完成
+        context->Flush();
+        
         // 映射并读取数据
         D3D11_MAPPED_SUBRESOURCE mapped;
         hr = context->Map(stagingTexture.Get(), 0, D3D11_MAP_READ, 0, &mapped);
         if (FAILED(hr)) {
+            std::cerr << "[SDK] GetHistogramData: Failed to map staging texture: 0x" 
+                      << std::hex << hr << std::dec << std::endl;
             return false;
         }
         
@@ -654,9 +664,16 @@ bool GetHistogramData(void* renderTargetHandle, uint32_t* outHistogram) {
         uint32_t sampleStep = std::max(1u, std::max(texDesc.Width / 256, texDesc.Height / 256));
         
         const uint8_t* srcData = static_cast<const uint8_t*>(mapped.pData);
+        uint32_t bytesPerPixel = 4;  // BGRA = 4 bytes per pixel
+        
         for (uint32_t y = 0; y < texDesc.Height; y += sampleStep) {
             for (uint32_t x = 0; x < texDesc.Width; x += sampleStep) {
-                uint32_t pixelOffset = y * mapped.RowPitch + x * 4; // BGRA format
+                uint32_t pixelOffset = y * mapped.RowPitch + x * bytesPerPixel;
+                
+                // 确保不越界
+                if (pixelOffset + bytesPerPixel > mapped.RowPitch * texDesc.Height) {
+                    continue;
+                }
                 
                 uint8_t b = srcData[pixelOffset + 0];
                 uint8_t g = srcData[pixelOffset + 1];
@@ -707,13 +724,11 @@ static std::shared_ptr<FilterNode> FindFilterNode(void* renderTargetHandle) {
 
 bool LoadFilterLUT(void* renderTargetHandle, uint32_t lutSize, const float* lutData) {
     if (!renderTargetHandle || !lutData || lutSize == 0 || lutSize > 256) {
-        std::cerr << "[SDK] Invalid parameters for LoadFilterLUT" << std::endl;
         return false;
     }
     
     auto it = g_RenderTargetData.find(renderTargetHandle);
     if (it == g_RenderTargetData.end() || !it->second || !it->second->RenderGraph) {
-        std::cerr << "[SDK] Invalid render target handle" << std::endl;
         return false;
     }
     
@@ -763,28 +778,23 @@ bool LoadFilterLUT(void* renderTargetHandle, uint32_t lutSize, const float* lutD
         
         // 加载 LUT
         if (!filterNode->LoadLUT(lutSize, lutData)) {
-            std::cerr << "[SDK] Failed to load LUT" << std::endl;
             return false;
         }
         
-        std::cout << "[SDK] Filter LUT loaded successfully: " << lutSize << "x" << lutSize << "x" << lutSize << std::endl;
         return true;
     }
     catch (const std::exception& e) {
-        std::cerr << "[SDK] Exception loading filter LUT: " << e.what() << std::endl;
         return false;
     }
 }
 
 bool LoadFilterLUTFromFile(void* renderTargetHandle, const char* filePath) {
     if (!renderTargetHandle || !filePath) {
-        std::cerr << "[SDK] Invalid parameters for LoadFilterLUTFromFile" << std::endl;
         return false;
     }
     
     auto it = g_RenderTargetData.find(renderTargetHandle);
     if (it == g_RenderTargetData.end() || !it->second || !it->second->RenderGraph) {
-        std::cerr << "[SDK] Invalid render target handle" << std::endl;
         return false;
     }
     
@@ -818,15 +828,12 @@ bool LoadFilterLUTFromFile(void* renderTargetHandle, const char* filePath) {
         
         // 从文件加载 LUT
         if (!filterNode->LoadLUTFromFile(filePath)) {
-            std::cerr << "[SDK] Failed to load LUT from file: " << filePath << std::endl;
             return false;
         }
         
-        std::cout << "[SDK] Filter LUT loaded from file: " << filePath << std::endl;
         return true;
     }
     catch (const std::exception& e) {
-        std::cerr << "[SDK] Exception loading filter LUT from file: " << e.what() << std::endl;
         return false;
     }
 }
@@ -869,11 +876,8 @@ void RemoveFilter(void* renderTargetHandle) {
         for (auto& node : savedNodes) {
             renderGraph->AddNode(node);
         }
-        
-        std::cout << "[SDK] Filter removed" << std::endl;
     }
     catch (const std::exception& e) {
-        std::cerr << "[SDK] Exception removing filter: " << e.what() << std::endl;
     }
 }
 
