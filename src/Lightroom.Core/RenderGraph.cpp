@@ -1,4 +1,4 @@
-#include "RenderGraph.h"
+﻿#include "RenderGraph.h"
 #include "VideoProcessing/VideoPerformanceProfiler.h"
 
 namespace LightroomCore {

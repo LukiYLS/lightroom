@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "RenderNodes/RenderNode.h"
 #include "RenderNodes/ComputeNode.h"

@@ -198,5 +198,70 @@ bool RAWImageLoader::ExtractRAWMetadata(const std::wstring& filePath) {
     return true;
 }
 
+std::shared_ptr<RenderCore::RHITexture2D> RAWImageLoader::LoadRAWDataToTexture(
+    const std::wstring& filePath,
+    std::shared_ptr<RenderCore::DynamicRHI> rhi) {
+    
+    if (!rhi) {
+        std::cerr << "[RAWImageLoader] RHI is null" << std::endl;
+        return nullptr;
+    }
+
+    // 打开 RAW 文件
+    if (!m_LibRawWrapper->OpenFile(filePath)) {
+        std::wcerr << L"[RAWImageLoader] Failed to open RAW file: " << filePath << std::endl;
+        std::cerr << "[RAWImageLoader] Error: " << m_LibRawWrapper->GetError() << std::endl;
+        return nullptr;
+    }
+
+    // 提取元数据
+    if (!ExtractRAWMetadata(filePath)) {
+        std::wcerr << L"[RAWImageLoader] Failed to extract metadata from: " << filePath << std::endl;
+        return nullptr;
+    }
+
+    // 加载原始 Bayer 数据（16-bit）
+    std::vector<uint16_t> rawData;
+    uint32_t rawWidth, rawHeight;
+    if (!LoadRAWData(filePath, rawData, rawWidth, rawHeight)) {
+        std::wcerr << L"[RAWImageLoader] Failed to load RAW data: " << filePath << std::endl;
+        return nullptr;
+    }
+
+    m_LastImageWidth = rawWidth;
+    m_LastImageHeight = rawHeight;
+
+    // 创建单通道纹理（使用 R32_FLOAT 格式以保持精度）
+    // 将 16-bit 数据转换为 float (0.0-1.0 范围)
+    std::vector<float> floatData(rawWidth * rawHeight);
+    for (size_t i = 0; i < rawData.size(); ++i) {
+        // 将 16-bit (0-65535) 归一化到 0.0-1.0
+        floatData[i] = static_cast<float>(rawData[i]) / 65535.0f;
+    }
+
+    // 使用 RHI 接口创建纹理（单通道 float）
+    // 注意：如果 RHI 不支持 R32_FLOAT，可能需要使用其他格式
+    uint32_t stride = rawWidth * sizeof(float);  // R32_FLOAT = 4 bytes per pixel
+    auto texture = rhi->RHICreateTexture2D(
+        RenderCore::EPixelFormat::PF_R32_FLOAT,
+        RenderCore::ETextureCreateFlags::TexCreate_ShaderResource,
+        rawWidth,
+        rawHeight,
+        1,  // NumMips
+        floatData.data(),
+        stride
+    );
+
+    if (!texture) {
+        std::cerr << "[RAWImageLoader] Failed to create RAW texture via RHI (format: R32_FLOAT, size: " 
+                  << rawWidth << "x" << rawHeight << ")" << std::endl;
+        return nullptr;
+    }
+
+    std::wcout << L"[RAWImageLoader] Successfully loaded RAW Bayer data: " << filePath 
+               << L" (" << rawWidth << L"x" << rawHeight << L", format: R32_FLOAT)" << std::endl;
+    return texture;
+}
+
 } // namespace LightroomCore
 

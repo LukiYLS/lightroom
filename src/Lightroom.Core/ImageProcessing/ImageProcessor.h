@@ -1,8 +1,9 @@
-﻿#pragma once
+#pragma once
 
 #include "../d3d11rhi/DynamicRHI.h"
 #include "ImageLoader.h"
 #include "RAWImageInfo.h"
+#include "RAWImageLoader.h"
 #include <string>
 #include <memory>
 
@@ -41,6 +42,11 @@ public:
     // RAW-specific: 获取 RAW 信息（仅在加载 RAW 文件后有效）
     const RAWImageInfo* GetRAWInfo() const {
         return (m_LastFormat == ImageFormat::RAW) ? m_LastRAWInfo.get() : nullptr;
+    }
+
+    // 获取 RAW 加载器（用于直接访问 RAW 功能）
+    RAWImageLoader* GetRAWLoader() {
+        return dynamic_cast<RAWImageLoader*>(m_RAWLoader.get());
     }
 
 private:

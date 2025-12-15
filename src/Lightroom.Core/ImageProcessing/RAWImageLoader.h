@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "ImageLoader.h"
 #include "RAWImageInfo.h"
@@ -30,6 +30,12 @@ public:
                      std::vector<uint16_t>& rawData,
                      uint32_t& outWidth,
                      uint32_t& outHeight);
+
+    // 加载 RAW 数据到纹理（16-bit Bayer pattern，用于 GPU 处理）
+    // 返回纹理，格式为 R16_UNORM（单通道 16-bit）
+    std::shared_ptr<RenderCore::RHITexture2D> LoadRAWDataToTexture(
+        const std::wstring& filePath,
+        std::shared_ptr<RenderCore::DynamicRHI> rhi);
 
 private:
     RAWImageInfo m_RAWInfo;

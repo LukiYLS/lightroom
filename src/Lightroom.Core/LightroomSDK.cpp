@@ -10,6 +10,9 @@
 #include "RenderNodes/ScaleNode.h"
 #include "RenderNodes/ImageAdjustNode.h"
 #include "RenderNodes/FilterNode.h"
+#include "RenderNodes/ComputeNode.h"
+#include "RenderNodes/RAWDemosaicComputeNode.h"
+#include "ImageProcessing/RAWImageLoader.h"
 #include "VideoProcessing/VideoProcessor.h"
 #include <iostream>
 #include <string>
@@ -175,33 +178,92 @@ bool LoadImageToTarget(void* renderTargetHandle, const char* imagePath) {
     }
     
     try {
-        // 使用图片处理器加载图片
-        data->ImageTexture = g_ImageProcessor->LoadImageFromFile(imagePath);
-        if (!data->ImageTexture) {
-            return false;
-        }
-        
-        data->bHasImage = true;
-        data->ImageFormat = g_ImageProcessor->GetLastImageFormat();
-        
-        // 如果是 RAW 格式，保存 RAW 信息
-        if (data->ImageFormat == LightroomCore::ImageFormat::RAW) {
-            const LightroomCore::RAWImageInfo* rawInfo = g_ImageProcessor->GetRAWInfo();
-            if (rawInfo) {
-                data->RAWInfo = std::make_unique<LightroomCore::RAWImageInfo>(*rawInfo);
+        // 先检查文件格式（不加载）
+        std::wstring wpath;
+        int pathLen = MultiByteToWideChar(CP_UTF8, 0, imagePath, -1, nullptr, 0);
+        if (pathLen > 0) {
+            wpath.resize(pathLen);
+            MultiByteToWideChar(CP_UTF8, 0, imagePath, -1, &wpath[0], pathLen);
+            if (!wpath.empty() && wpath.back() == L'\0') {
+                wpath.pop_back();
             }
-        } else {
-            data->RAWInfo.reset();
         }
+        
+        // 检查是否为 RAW 格式
+        bool isRAW = g_ImageProcessor->IsRAWFormat(wpath);
         
         // 根据图片格式和尺寸，决定使用哪个节点
         auto* renderTargetInfo = g_RenderTargetManager->GetRenderTargetInfo(renderTargetHandle);
         if (renderTargetInfo) {
             uint32_t imageWidth, imageHeight;
-            g_ImageProcessor->GetLastImageSize(imageWidth, imageHeight);
             
             // 清除旧的渲染图
             data->RenderGraph->Clear();
+            
+            // 如果是 RAW 格式，使用 Compute Shader 进行去马赛克
+            if (isRAW) {
+                // 重新加载 RAW 数据为原始 Bayer 纹理
+                RAWImageLoader* rawLoader = g_ImageProcessor->GetRAWLoader();
+                if (rawLoader) {
+                    auto bayerTexture = rawLoader->LoadRAWDataToTexture(wpath, g_DynamicRHI);
+                    if (bayerTexture) {
+                        // 更新图像纹理为 Bayer 数据
+                        data->ImageTexture = bayerTexture;
+                        data->bHasImage = true;
+                        data->ImageFormat = LightroomCore::ImageFormat::RAW;
+                        
+                        // 获取 RAW 信息
+                        const LightroomCore::RAWImageInfo& rawInfo = rawLoader->GetRAWInfo();
+                        data->RAWInfo = std::make_unique<LightroomCore::RAWImageInfo>(rawInfo);
+                        
+                        // 添加 RAW 去马赛克 Compute Node
+                        auto demosaicNode = std::make_shared<RAWDemosaicComputeNode>(g_DynamicRHI);
+                        // 设置 Bayer pattern（从 RAW 信息中获取）
+                        demosaicNode->SetBayerPattern(data->RAWInfo->bayerPattern);
+                        // 设置白平衡（从 RAW 信息中获取）
+                        demosaicNode->SetWhiteBalance(
+                            data->RAWInfo->whiteBalance[0],  // R
+                            data->RAWInfo->whiteBalance[1],  // G1
+                            data->RAWInfo->whiteBalance[2]   // B
+                        );
+                        data->RenderGraph->AddComputeNode(demosaicNode);
+                        
+                        // 更新图像尺寸为去马赛克后的尺寸（与原始尺寸相同）
+                        imageWidth = data->RAWInfo->width;
+                        imageHeight = data->RAWInfo->height;
+                    } else {
+                        // 如果加载 Bayer 纹理失败，回退到使用标准加载方式
+                        data->ImageTexture = g_ImageProcessor->LoadImageFromFile(imagePath);
+                        if (!data->ImageTexture) {
+                            return false;
+                        }
+                        data->bHasImage = true;
+                        data->ImageFormat = g_ImageProcessor->GetLastImageFormat();
+                        g_ImageProcessor->GetLastImageSize(imageWidth, imageHeight);
+                        data->RAWInfo.reset();
+                    }
+                } else {
+                    // 如果无法获取 RAW 加载器，使用标准加载方式
+                    data->ImageTexture = g_ImageProcessor->LoadImageFromFile(imagePath);
+                    if (!data->ImageTexture) {
+                        return false;
+                    }
+                    data->bHasImage = true;
+                    data->ImageFormat = g_ImageProcessor->GetLastImageFormat();
+                    g_ImageProcessor->GetLastImageSize(imageWidth, imageHeight);
+                    data->RAWInfo.reset();
+                }
+            } else {
+                // 非 RAW 格式，使用标准加载方式
+                data->ImageTexture = g_ImageProcessor->LoadImageFromFile(imagePath);
+                if (!data->ImageTexture) {
+                    return false;
+                }
+                data->bHasImage = true;
+                data->ImageFormat = g_ImageProcessor->GetLastImageFormat();
+                g_ImageProcessor->GetLastImageSize(imageWidth, imageHeight);
+                data->RAWInfo.reset();
+            }
             
             // 添加通用的图像调整节点（适用于 RAW 和标准图片）
             auto adjustNode = std::make_shared<ImageAdjustNode>(g_DynamicRHI);
