@@ -5,6 +5,8 @@
 #include "../d3d11rhi/D3D11UnorderedAccessView.h"
 #include <cstring>
 #include <d3dcompiler.h>
+#include <Windows.h>
+#include <cstdio>
 
 namespace LightroomCore {
 
@@ -12,7 +14,6 @@ namespace LightroomCore {
         : ComputeNode(rhi)
         , m_Constants{}
     {
-        // Ä¬ÈÏÖµ
         m_Constants.bayerPattern = 0;  // RGGB
         m_Constants.whiteBalanceR = 1.0f;
         m_Constants.whiteBalanceG = 1.0f;
@@ -20,7 +21,6 @@ namespace LightroomCore {
     }
 
     RAWDemosaicComputeNode::~RAWDemosaicComputeNode() {
-        m_OutputUAV.reset();
         m_ConstantBuffer.reset();
     }
 
@@ -36,16 +36,12 @@ namespace LightroomCore {
 
     bool RAWDemosaicComputeNode::InitializeComputeShader(const char* csCode) {
         if (m_ComputeShaderInitialized) {
-            std::cerr << "[RAWDemosaicComputeNode] Shader already initialized" << std::endl;
             return true;
         }
 
         if (!m_RHI) {
-            std::cerr << "[RAWDemosaicComputeNode] RHI is null" << std::endl;
             return false;
         }
-
-        std::cerr << "[RAWDemosaicComputeNode] Initializing Compute Shader..." << std::endl;
 
         RenderCore::D3D11DynamicRHI* d3d11RHI = dynamic_cast<RenderCore::D3D11DynamicRHI*>(m_RHI.get());
         if (!d3d11RHI) {
@@ -57,10 +53,9 @@ namespace LightroomCore {
             return false;
         }
 
-        // ´ÓÄÚ´æ±àÒë Compute Shader£¨ÀàËÆÓÚ RenderNode µÄ×ö·¨£©
         const char* shaderCode = GetComputeShaderCode();
-        Microsoft::WRL::ComPtr<ID3DBlob> errorBlob;
-        Microsoft::WRL::ComPtr<ID3DBlob> shaderBlob;
+        ComPtr<ID3DBlob> errorBlob;
+        ComPtr<ID3DBlob> shaderBlob;
 
         HRESULT hr = D3DCompile(
             shaderCode,
@@ -76,20 +71,9 @@ namespace LightroomCore {
             errorBlob.GetAddressOf()
         );
 
-        if (FAILED(hr)) {
-            if (errorBlob) {
-                const char* errorMsg = (const char*)errorBlob->GetBufferPointer();
-                std::cerr << "[RAWDemosaicComputeNode] Shader compile error: " << errorMsg << std::endl;
-            }
-            else {
-                std::cerr << "[RAWDemosaicComputeNode] Shader compile failed: 0x" << std::hex << hr << std::dec << std::endl;
-            }
-            return false;
-        }
+        if (FAILED(hr)) 
+            return false;      
 
-        std::cerr << "[RAWDemosaicComputeNode] Shader compiled successfully" << std::endl;
-
-        // ´´½¨ Compute Shader
         hr = device->CreateComputeShader(
             shaderBlob->GetBufferPointer(),
             shaderBlob->GetBufferSize(),
@@ -98,55 +82,16 @@ namespace LightroomCore {
         );
 
         if (FAILED(hr)) {
-            std::cerr << "[RAWDemosaicComputeNode] Failed to create Compute Shader: 0x" << std::hex << hr << std::dec << std::endl;
             return false;
         }
-
-        std::cerr << "[RAWDemosaicComputeNode] Compute Shader created successfully" << std::endl;
-
-        // ´´½¨ constant buffer
         if (!m_ConstantBuffer) {
             m_ConstantBuffer = m_RHI->RHICreateUniformBuffer(sizeof(DemosaicConstants));
             if (!m_ConstantBuffer) {
-                std::cerr << "[RAWDemosaicComputeNode] Failed to create constant buffer" << std::endl;
                 return false;
             }
-            std::cerr << "[RAWDemosaicComputeNode] Constant buffer created successfully" << std::endl;
         }
-
         m_ComputeShaderInitialized = true;
-        std::cerr << "[RAWDemosaicComputeNode] Compute Shader initialization completed" << std::endl;
         return true;
-    }
-
-    void RAWDemosaicComputeNode::SetComputeShader() {
-        // Èç¹û»¹Ã»ÓÐ³õÊ¼»¯£¬ÏÈ³õÊ¼»¯
-        if (!m_ComputeShaderInitialized) {
-            if (!InitializeComputeShader(nullptr)) {
-                std::cerr << "[RAWDemosaicComputeNode] Failed to initialize Compute Shader" << std::endl;
-                return;
-            }
-        }
-
-        // Ê¹ÓÃ D3D11 ½Ó¿ÚÖ±½ÓÉèÖÃ Compute Shader
-        RenderCore::D3D11DynamicRHI* d3d11RHI = dynamic_cast<RenderCore::D3D11DynamicRHI*>(m_RHI.get());
-        if (!d3d11RHI) {
-            std::cerr << "[RAWDemosaicComputeNode] Failed to get D3D11 RHI" << std::endl;
-            return;
-        }
-
-        if (!m_D3D11ComputeShader) {
-            std::cerr << "[RAWDemosaicComputeNode] Compute Shader is null" << std::endl;
-            return;
-        }
-
-        ID3D11DeviceContext* d3d11Context = d3d11RHI->GetDeviceContext();
-        if (d3d11Context) {
-            d3d11Context->CSSetShader(m_D3D11ComputeShader.Get(), nullptr, 0);
-        }
-        else {
-            std::cerr << "[RAWDemosaicComputeNode] Failed to get D3D11 Device Context" << std::endl;
-        }
     }
 
     void RAWDemosaicComputeNode::UpdateConstantBuffers(uint32_t width, uint32_t height) {
@@ -158,66 +103,8 @@ namespace LightroomCore {
         }
     }
 
-    void RAWDemosaicComputeNode::SetConstantBuffers() {
-        if (m_ConstantBuffer) {
-            m_CommandContext->RHISetShaderUniformBuffer(
-                RenderCore::EShaderFrequency::SF_Compute,
-                0,
-                m_ConstantBuffer
-            );
-        }
-    }
-
-    void RAWDemosaicComputeNode::SetShaderResources(std::shared_ptr<RenderCore::RHITexture2D> inputTexture) {
-        if (!inputTexture) {
-            std::cerr << "[RAWDemosaicComputeNode] Input texture is null" << std::endl;
-            return;
-        }
-
-        m_CommandContext->RHISetShaderTexture(
-            RenderCore::EShaderFrequency::SF_Compute,
-            0,
-            inputTexture
-        );
-    }
-
-    void RAWDemosaicComputeNode::SetUnorderedAccessViews(std::shared_ptr<RenderCore::RHITexture2D> outputTexture) {
-        if (!outputTexture) {
-            std::cerr << "[RAWDemosaicComputeNode] Output texture is null" << std::endl;
-            return;
-        }
-
-        // ´´½¨»ò¸üÐÂ UAV
-        if (!m_OutputUAV) {
-            m_OutputUAV = m_RHI->RHICreateUnorderedAccessView(outputTexture);
-            if (!m_OutputUAV) {
-                std::cerr << "[RAWDemosaicComputeNode] Failed to create UAV" << std::endl;
-                return;
-            }
-        }
-        else {
-            // Èç¹ûÎÆÀí¸Ä±äÁË£¬ÐèÒªÖØÐÂ´´½¨ UAV
-            auto currentTexture = m_OutputUAV->GetTexture2D();
-            if (currentTexture != outputTexture) {
-                m_OutputUAV = m_RHI->RHICreateUnorderedAccessView(outputTexture);
-                if (!m_OutputUAV) {
-                    std::cerr << "[RAWDemosaicComputeNode] Failed to recreate UAV" << std::endl;
-                    return;
-                }
-            }
-        }
-
-        if (m_OutputUAV) {
-            m_CommandContext->RHISetUAVParameter(0, m_OutputUAV);
-        }
-        else {
-            std::cerr << "[RAWDemosaicComputeNode] UAV is null after creation" << std::endl;
-        }
-    }
 
     const char* RAWDemosaicComputeNode::GetComputeShaderCode() {
-        // RAW È¥ÂíÈü¿Ë Compute Shader ´úÂë
-        // Ê¹ÓÃË«ÏßÐÔ²åÖµËã·¨£¨Bilinear Demosaicing£©
         return R"(
 cbuffer DemosaicConstants : register(b0) {
     uint width;
@@ -242,13 +129,13 @@ void main(uint3 id : SV_DispatchThreadID) {
     uint2 pos = id.xy;
     float center = BayerTexture[pos].r;
     
-    // ¸ù¾Ý Bayer pattern È·¶¨µ±Ç°Î»ÖÃµÄÑÕÉ«
+    // ï¿½ï¿½ï¿½ï¿½ Bayer pattern È·ï¿½ï¿½ï¿½ï¿½Ç°Î»ï¿½Ãµï¿½ï¿½ï¿½É«
     uint pattern = bayerPattern;
     uint xMod = pos.x % 2;
     uint yMod = pos.y % 2;
     uint colorIndex = (yMod << 1) | xMod;
     
-    // ¸ù¾Ý pattern µ÷Õû colorIndex
+    // ï¿½ï¿½ï¿½ï¿½ pattern ï¿½ï¿½ï¿½ï¿½ colorIndex
     // 0=RGGB: (0,0)=R, (1,0)=G, (0,1)=G, (1,1)=B
     // 1=GRBG: (0,0)=G, (1,0)=R, (0,1)=B, (1,1)=G
     // 2=GBRG: (0,0)=G, (1,0)=B, (0,1)=R, (1,1)=G
@@ -257,7 +144,7 @@ void main(uint3 id : SV_DispatchThreadID) {
     
     float r = 0.0, g = 0.0, b = 0.0;
     
-    // Ë«ÏßÐÔ²åÖµÈ¥ÂíÈü¿Ë
+    // Ë«ï¿½ï¿½ï¿½Ô²ï¿½ÖµÈ¥ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     if (actualColorIndex == 0) {
         // Red pixel
         r = center;
@@ -282,7 +169,7 @@ void main(uint3 id : SV_DispatchThreadID) {
             r = (BayerTexture[uint2(pos.x - 1, pos.y)].r + BayerTexture[uint2(pos.x + 1, pos.y)].r) * 0.5f;
             b = (BayerTexture[uint2(pos.x, pos.y - 1)].r + BayerTexture[uint2(pos.x, pos.y + 1)].r) * 0.5f;
         } else {
-            // ±ß½ç´¦Àí
+            // ï¿½ß½ç´¦ï¿½ï¿½
             r = center;
             b = center;
         }
@@ -305,15 +192,15 @@ void main(uint3 id : SV_DispatchThreadID) {
         }
     }
     
-    // Ó¦ÓÃ°×Æ½ºâ
+    // Ó¦ï¿½Ã°ï¿½Æ½ï¿½ï¿½
     r *= whiteBalanceR;
     g *= whiteBalanceG;
     b *= whiteBalanceB;
     
-    // ÊäÈëÒÑ¾­ÊÇ 0-1 ·¶Î§µÄ float£¨´Ó 16-bit Êý¾Ý¹éÒ»»¯¶øÀ´£©
-    // Ö±½ÓÊ¹ÓÃ£¬ÎÞÐèÔÙ´Î¹éÒ»»¯
+    // ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ 0-1 ï¿½ï¿½Î§ï¿½ï¿½ floatï¿½ï¿½ï¿½ï¿½ 16-bit ï¿½ï¿½ï¿½Ý¹ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+    // Ö±ï¿½ï¿½Ê¹ï¿½Ã£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ù´Î¹ï¿½Ò»ï¿½ï¿½
     
-    // Êä³ö BGRA ¸ñÊ½
+    // ï¿½ï¿½ï¿½ BGRA ï¿½ï¿½Ê½
     OutputTexture[pos] = float4(b, g, r, 1.0);
 }
 )";

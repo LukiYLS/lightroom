@@ -3,8 +3,12 @@
 #include "../d3d11rhi/D3D11CommandContext.h"
 #include "../d3d11rhi/D3D11Texture2D.h"
 #include "../d3d11rhi/D3D11UnorderedAccessView.h"
+#include "../d3d11rhi/D3D11ReourceTraits.h"
+#include "../d3d11rhi/RHIUniformBuffer.h"
 #include <d3dcompiler.h>
-#include <iostream>
+#include <Windows.h>
+#include <wrl/client.h>
+#include <cstdio>
 
 #pragma comment(lib, "d3dcompiler.lib")
 
@@ -20,6 +24,78 @@ namespace LightroomCore {
 
 	ComputeNode::~ComputeNode() {
 		m_ComputeShader.reset();
+		m_OutputUAV.reset();
+	}
+
+	void ComputeNode::SetConstantBuffers() {
+		std::shared_ptr<RenderCore::RHIUniformBuffer> constantBuffer = GetConstantBuffer();
+		if (constantBuffer) {
+			m_CommandContext->RHISetShaderUniformBuffer(
+				RenderCore::EShaderFrequency::SF_Compute,
+				0,
+				constantBuffer
+			);
+		}
+	}
+
+	void ComputeNode::SetShaderResources(std::shared_ptr<RenderCore::RHITexture2D> inputTexture) {
+		if (!inputTexture) {
+			return;
+		}
+		m_CommandContext->RHISetShaderTexture(
+			RenderCore::EShaderFrequency::SF_Compute,
+			0,
+			inputTexture
+		);
+	}
+
+	void ComputeNode::SetUnorderedAccessViews(std::shared_ptr<RenderCore::RHITexture2D> outputTexture) {
+		if (!outputTexture) {
+			return;
+		}
+
+		// Create or update UAV
+		if (!m_OutputUAV) {
+			m_OutputUAV = m_RHI->RHICreateUnorderedAccessView(outputTexture);
+			if (!m_OutputUAV) {
+				return;
+			}
+		}
+		else {
+			auto currentTexture = m_OutputUAV->GetTexture2D();
+			if (currentTexture != outputTexture) {
+				m_OutputUAV = m_RHI->RHICreateUnorderedAccessView(outputTexture);
+				if (!m_OutputUAV) {
+					return;
+				}
+			}
+		}
+
+		if (m_OutputUAV) {
+			m_CommandContext->RHISetUAVParameter(0, m_OutputUAV);
+		}
+	}
+
+	void ComputeNode::SetComputeShader() {
+		if (!m_ComputeShaderInitialized) {
+			if (!InitializeComputeShader(nullptr)) {
+				return;
+			}
+		}
+		ID3D11ComputeShader* computeShader = GetD3D11ComputeShader();
+		if (!computeShader) {
+			return;
+		}
+
+		RenderCore::D3D11DynamicRHI* d3d11RHI = dynamic_cast<RenderCore::D3D11DynamicRHI*>(m_RHI.get());
+		if (!d3d11RHI) {
+			return;
+		}
+
+		ID3D11DeviceContext* d3d11Context = d3d11RHI->GetDeviceContext();
+		if (d3d11Context) {
+			d3d11Context->CSSetShader(computeShader, nullptr, 0);
+		}
 	}
 
 	bool ComputeNode::InitializeComputeShader(const char* csCode) {
@@ -27,11 +103,6 @@ namespace LightroomCore {
 			return m_ComputeShaderInitialized;
 		}
 
-		// 注意：RHI接口需要文件路径，这里我们暂时使用内联shader代码
-		// 实际使用时，应该将shader代码保存到文件，然后使用RHICreateComputeShader
-		// 或者扩展RHI接口支持从内存编译
-
-		// 这里先标记为已初始化，实际shader编译由子类实现
 		m_ComputeShaderInitialized = true;
 		return true;
 	}
@@ -40,16 +111,8 @@ namespace LightroomCore {
 		std::shared_ptr<RenderCore::RHITexture2D> outputTexture,
 		uint32_t width, uint32_t height) {
 		if (!m_CommandContext || !inputTexture || !outputTexture) {
-			std::cerr << "[ComputeNode::Execute] Invalid parameters: context="
-				<< (m_CommandContext ? "valid" : "null")
-				<< ", input=" << (inputTexture ? "valid" : "null")
-				<< ", output=" << (outputTexture ? "valid" : "null") << std::endl;
 			return false;
 		}
-
-		std::cerr << "[ComputeNode::Execute] Starting execution: " << GetName()
-			<< ", size=" << width << "x" << height << std::endl;
-
 		RenderCore::D3D11DynamicRHI* d3d11RHI = dynamic_cast<RenderCore::D3D11DynamicRHI*>(m_RHI.get());
 		if (!d3d11RHI) {
 			return false;
@@ -60,42 +123,27 @@ namespace LightroomCore {
 			return false;
 		}
 
-		// 1. 更新constant buffers（由子类实现）
 		UpdateConstantBuffers(width, height);
-
-		// 2. 设置constant buffers（由子类实现）
+		SetComputeShader();		
 		SetConstantBuffers();
-
-		// 3. 设置输入资源（SRV）- 通过子类实现
 		SetShaderResources(inputTexture);
 
-		// 4. 设置输出资源（UAV）- 通过子类实现
-		SetUnorderedAccessViews(outputTexture);
+		SetUnorderedAccessViews(outputTexture); 
 
-		// 5. 设置 Compute Shader 到 Pipeline State（由子类实现）
-		// 注意：SetComputeShader() 会检查并初始化 shader（如果尚未初始化）
-		SetComputeShader();
-
-		// 检查 shader 是否已成功初始化
-		if (!m_ComputeShaderInitialized) {
-			return false;
-		}
-
-		// 6. 计算线程组数量
 		uint32_t threadGroupCountX = (width + m_ThreadGroupSizeX - 1) / m_ThreadGroupSizeX;
 		uint32_t threadGroupCountY = (height + m_ThreadGroupSizeY - 1) / m_ThreadGroupSizeY;
 
-		// 7. 执行Compute Shader
 		m_CommandContext->RHIDispatchComputeShader(threadGroupCountX, threadGroupCountY, 1);
 
-		// 8. 清理UAV和SRV绑定（RHIDispatchComputeShader 内部已经清理了UAV，但SRV需要手动清理）
+		ID3D11UnorderedAccessView* nullUAV = nullptr;
+		d3d11Context->CSSetUnorderedAccessViews(0, 1, &nullUAV, nullptr);
 		ID3D11ShaderResourceView* nullSRV = nullptr;
 		d3d11Context->CSSetShaderResources(0, 1, &nullSRV);
+		d3d11Context->CSSetShader(nullptr, nullptr, 0);
 
-		// 9. 刷新命令
-		std::cerr << "[ComputeNode::Execute] Flushing commands..." << std::endl;
+
 		m_CommandContext->FlushCommands();
-		std::cerr << "[ComputeNode::Execute] Execution completed successfully" << std::endl;
+
 
 		return true;
 	}
