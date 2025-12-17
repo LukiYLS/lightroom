@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "../d3d11rhi/DynamicRHI.h"
 #include "ImageLoader.h"
@@ -9,42 +9,42 @@
 
 namespace LightroomCore {
 
-// 图片处理模块：负责图片加载和处理，使用 RHI 接口
-// 使用工厂模式自动选择 StandardImageLoader 或 RAWImageLoader
+// Image processing module: responsible for image loading and processing, using RHI interface
+// Uses factory pattern to automatically select StandardImageLoader or RAWImageLoader
 
 class ImageProcessor {
 public:
     ImageProcessor(std::shared_ptr<RenderCore::DynamicRHI> rhi);
     ~ImageProcessor();
 
-    // 从文件加载图片到 RHI 纹理（工厂方法 - 自动选择加载器）
-    // 返回的纹理由调用者管理生命周期
+    // Load image from file to RHI texture (factory method - automatically selects loader)
+    // Returned texture lifetime is managed by caller
     std::shared_ptr<RenderCore::RHITexture2D> LoadImageFromFile(const char* imagePath);
 
-    // 从文件加载图片到 RHI 纹理（宽字符路径版本）
+    // Load image from file to RHI texture (wide character path version)
     std::shared_ptr<RenderCore::RHITexture2D> LoadImageFromFile(const std::wstring& imagePath);
 
-    // 获取最后加载的图片尺寸
+    // Get last loaded image size
     void GetLastImageSize(uint32_t& width, uint32_t& height) const {
         width = m_LastImageWidth;
         height = m_LastImageHeight;
     }
 
-    // 检查文件是否为 RAW 格式
+    // Check if file is RAW format
     bool IsRAWFormat(const std::wstring& filePath) const;
 
-    // 获取图片格式
+    // Get image format
     ImageFormat GetImageFormat(const std::wstring& filePath) const;
 
-    // 获取最后加载的图片格式
+    // Get last loaded image format
     ImageFormat GetLastImageFormat() const { return m_LastFormat; }
 
-    // RAW-specific: 获取 RAW 信息（仅在加载 RAW 文件后有效）
+    // RAW-specific: Get RAW info (only valid after loading RAW file)
     const RAWImageInfo* GetRAWInfo() const {
         return (m_LastFormat == ImageFormat::RAW) ? m_LastRAWInfo.get() : nullptr;
     }
 
-    // 获取 RAW 加载器（用于直接访问 RAW 功能）
+    // Get RAW loader (for direct access to RAW functionality)
     RAWImageLoader* GetRAWLoader() {
         return dynamic_cast<RAWImageLoader*>(m_RAWLoader.get());
     }
@@ -55,17 +55,15 @@ private:
     uint32_t m_LastImageHeight;
     ImageFormat m_LastFormat;
 
-    // 加载器实例
+    // Loader instances
     std::unique_ptr<IImageLoader> m_StandardLoader;
     std::unique_ptr<IImageLoader> m_RAWLoader;
 
-    // RAW 信息（仅在加载 RAW 文件时有效）
+    // RAW info (only valid when loading RAW file)
     std::unique_ptr<RAWImageInfo> m_LastRAWInfo;
 
-    // 选择适当的加载器
+    // Select appropriate loader
     IImageLoader* SelectLoader(const std::wstring& filePath);
 };
 
 } // namespace LightroomCore
-
-

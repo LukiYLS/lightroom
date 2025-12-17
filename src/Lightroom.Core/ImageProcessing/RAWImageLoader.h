@@ -8,7 +8,7 @@
 
 namespace LightroomCore {
 
-// RAW 图片加载器（使用 LibRaw）
+// RAW image loader (using LibRaw)
 class RAWImageLoader : public IImageLoader {
 public:
     RAWImageLoader();
@@ -24,15 +24,15 @@ public:
     // RAW-specific methods
     const RAWImageInfo& GetRAWInfo() const { return m_RAWInfo; }
     
-    // 加载 RAW 数据（16-bit Bayer pattern）
-    // 返回 true 表示成功，rawData 包含原始 Bayer 数据
+    // Load RAW data (16-bit Bayer pattern)
+    // Returns true on success, rawData contains raw Bayer data
     bool LoadRAWData(const std::wstring& filePath, 
                      std::vector<uint16_t>& rawData,
                      uint32_t& outWidth,
                      uint32_t& outHeight);
 
-    // 加载 RAW 数据到纹理（16-bit Bayer pattern，用于 GPU 处理）
-    // 返回纹理，格式为 R16_UNORM（单通道 16-bit）
+    // Load RAW data to texture (16-bit Bayer pattern, for GPU processing)
+    // Returns texture with format R16_UNORM (single channel 16-bit)
     std::shared_ptr<RenderCore::RHITexture2D> LoadRAWDataToTexture(
         const std::wstring& filePath,
         std::shared_ptr<RenderCore::DynamicRHI> rhi);
@@ -43,12 +43,11 @@ private:
     uint32_t m_LastImageHeight;
     std::unique_ptr<LibRawWrapper> m_LibRawWrapper;
 
-    // 检查文件扩展名是否为 RAW 格式
+    // Check if file extension is RAW format
     bool IsRAWFormat(const std::wstring& filePath) const;
 
-    // 从文件路径提取元数据
+    // Extract metadata from file path
     bool ExtractRAWMetadata(const std::wstring& filePath);
 };
 
 } // namespace LightroomCore
-

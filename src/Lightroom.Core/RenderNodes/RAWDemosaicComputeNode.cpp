@@ -57,20 +57,36 @@ namespace LightroomCore {
         ComPtr<ID3DBlob> errorBlob;
         ComPtr<ID3DBlob> shaderBlob;
 
-        HRESULT hr = D3DCompile(
-            shaderCode,
-            strlen(shaderCode),
-            nullptr,
-            nullptr,
-            nullptr,
-            "main",
-            "cs_5_0",
-            0,
-            0,
-            shaderBlob.GetAddressOf(),
-            errorBlob.GetAddressOf()
-        );
+		// 在 InitializeComputeShader 函数中
 
+		HRESULT hr = D3DCompile(
+			shaderCode,
+			strlen(shaderCode),
+			nullptr,
+			nullptr,
+			nullptr,
+			"main",
+			"cs_5_0",
+			0, // Flags1: 建议加上 D3DCOMPILE_DEBUG 用于调试，发布时去掉
+			0,
+			shaderBlob.GetAddressOf(),
+			errorBlob.GetAddressOf() // 确保这里传入了 errorBlob
+		);
+
+		if (FAILED(hr)) {
+			if (errorBlob) {
+				// =======================================================
+				// 【关键步骤】请把这段 Log 打印出来，或者在 VS 的 Output 窗口看
+				// =======================================================
+				const char* errorMsg = (const char*)errorBlob->GetBufferPointer();
+
+				// 方式 A: 输出到 VS 调试窗口 (Debug Output)
+				OutputDebugStringA("============= SHADER COMPILE ERROR =============\n");
+				OutputDebugStringA(errorMsg);
+				OutputDebugStringA("\n================================================\n");
+			}
+			return false;
+		}
         if (FAILED(hr)) 
             return false;      
 
@@ -104,12 +120,12 @@ namespace LightroomCore {
     }
 
 
-    const char* RAWDemosaicComputeNode::GetComputeShaderCode() {
-        return R"(
+	const char* RAWDemosaicComputeNode::GetComputeShaderCode() {
+		return R"(
 cbuffer DemosaicConstants : register(b0) {
     uint width;
     uint height;
-    uint bayerPattern;  // 0=RGGB, 1=GRBG, 2=GBRG, 3=BGGR
+    uint bayerPattern; // 0=RGGB, 1=GRBG, 2=GBRG, 3=BGGR
     uint padding;
     float whiteBalanceR;
     float whiteBalanceG;
@@ -120,90 +136,75 @@ cbuffer DemosaicConstants : register(b0) {
 Texture2D<float> BayerTexture : register(t0);
 RWTexture2D<float4> OutputTexture : register(u0);
 
-[numthreads(8, 8, 1)]
-void main(uint3 id : SV_DispatchThreadID) {
-    if (id.x >= width || id.y >= height) {
+float SafeLoad(int x, int y) {
+    int cx = clamp(x, 0, (int)width - 1);
+    int cy = clamp(y, 0, (int)height - 1);
+    return BayerTexture.Load(int3(cx, cy, 0));
+}
+
+[numthreads(16, 16, 1)]
+void main(uint3 dtid : SV_DispatchThreadID) {
+    int x = (int)dtid.x;
+    int y = (int)dtid.y;
+    
+    if ((uint)x >= width || (uint)y >= height) {
         return;
     }
 
-    uint2 pos = id.xy;
-    float center = BayerTexture[pos].r;
+    int xOff = 0;
+    int yOff = 0;
     
-    // ���� Bayer pattern ȷ����ǰλ�õ���ɫ
-    uint pattern = bayerPattern;
-    uint xMod = pos.x % 2;
-    uint yMod = pos.y % 2;
-    uint colorIndex = (yMod << 1) | xMod;
+    if (bayerPattern == 1 || bayerPattern == 3) xOff = 1;
+    if (bayerPattern == 2 || bayerPattern == 3) yOff = 1;
+
+    int lx = x + xOff;
+    int ly = y + yOff;
+
+    bool isEvenX = (lx % 2) == 0;
+    bool isEvenY = (ly % 2) == 0;
+
+    bool isRed  = isEvenX && isEvenY;
+    bool isBlue = !isEvenX && !isEvenY;
+    bool isGreen = !isRed && !isBlue;
+
+    float center = SafeLoad(x, y);
     
-    // ���� pattern ���� colorIndex
-    // 0=RGGB: (0,0)=R, (1,0)=G, (0,1)=G, (1,1)=B
-    // 1=GRBG: (0,0)=G, (1,0)=R, (0,1)=B, (1,1)=G
-    // 2=GBRG: (0,0)=G, (1,0)=B, (0,1)=R, (1,1)=G
-    // 3=BGGR: (0,0)=B, (1,0)=G, (0,1)=G, (1,1)=R
-    uint actualColorIndex = (colorIndex + pattern) % 4;
-    
-    float r = 0.0, g = 0.0, b = 0.0;
-    
-    // ˫���Բ�ֵȥ������
-    if (actualColorIndex == 0) {
-        // Red pixel
+    if (center <= 0.0f) {
+        OutputTexture[int2(x, y)] = float4(0.0f, 0.0f, 0.0f, 1.0f);
+        return;
+    }
+    float r = 0.0f;
+    float g = 0.0f;
+    float b = 0.0f;
+
+    if (isRed) {
         r = center;
-        if (pos.x > 0 && pos.x < width - 1) {
-            g = (BayerTexture[uint2(pos.x - 1, pos.y)].r + BayerTexture[uint2(pos.x + 1, pos.y)].r) * 0.5f;
-        } else if (pos.x > 0) {
-            g = BayerTexture[uint2(pos.x - 1, pos.y)].r;
-        } else {
-            g = BayerTexture[uint2(pos.x + 1, pos.y)].r;
-        }
-        if (pos.y > 0 && pos.y < height - 1) {
-            b = (BayerTexture[uint2(pos.x, pos.y - 1)].r + BayerTexture[uint2(pos.x, pos.y + 1)].r) * 0.5f;
-        } else if (pos.y > 0) {
-            b = BayerTexture[uint2(pos.x, pos.y - 1)].r;
-        } else {
-            b = BayerTexture[uint2(pos.x, pos.y + 1)].r;
-        }
-    } else if (actualColorIndex == 1 || actualColorIndex == 2) {
-        // Green pixel
-        g = center;
-        if (pos.x > 0 && pos.x < width - 1 && pos.y > 0 && pos.y < height - 1) {
-            r = (BayerTexture[uint2(pos.x - 1, pos.y)].r + BayerTexture[uint2(pos.x + 1, pos.y)].r) * 0.5f;
-            b = (BayerTexture[uint2(pos.x, pos.y - 1)].r + BayerTexture[uint2(pos.x, pos.y + 1)].r) * 0.5f;
-        } else {
-            // �߽紦��
-            r = center;
-            b = center;
-        }
-    } else {
-        // Blue pixel
+        g = (SafeLoad(x-1, y) + SafeLoad(x+1, y) + SafeLoad(x, y-1) + SafeLoad(x, y+1)) * 0.25f;
+        b = (SafeLoad(x-1, y-1) + SafeLoad(x+1, y-1) + SafeLoad(x-1, y+1) + SafeLoad(x+1, y+1)) * 0.25f;
+    }
+    else if (isBlue) {
         b = center;
-        if (pos.x > 0 && pos.x < width - 1) {
-            g = (BayerTexture[uint2(pos.x - 1, pos.y)].r + BayerTexture[uint2(pos.x + 1, pos.y)].r) * 0.5f;
-        } else if (pos.x > 0) {
-            g = BayerTexture[uint2(pos.x - 1, pos.y)].r;
-        } else {
-            g = BayerTexture[uint2(pos.x + 1, pos.y)].r;
+        g = (SafeLoad(x-1, y) + SafeLoad(x+1, y) + SafeLoad(x, y-1) + SafeLoad(x, y+1)) * 0.25f;
+        r = (SafeLoad(x-1, y-1) + SafeLoad(x+1, y-1) + SafeLoad(x-1, y+1) + SafeLoad(x+1, y+1)) * 0.25f;
+    }
+    else {
+        g = center;
+        if (isEvenX) {
+            r = (SafeLoad(x-1, y) + SafeLoad(x+1, y)) * 0.5f;
+            b = (SafeLoad(x, y-1) + SafeLoad(x, y+1)) * 0.5f;
         }
-        if (pos.y > 0 && pos.y < height - 1) {
-            r = (BayerTexture[uint2(pos.x, pos.y - 1)].r + BayerTexture[uint2(pos.x, pos.y + 1)].r) * 0.5f;
-        } else if (pos.y > 0) {
-            r = BayerTexture[uint2(pos.x, pos.y - 1)].r;
-        } else {
-            r = BayerTexture[uint2(pos.x, pos.y + 1)].r;
+        else {
+            b = (SafeLoad(x-1, y) + SafeLoad(x+1, y)) * 0.5f;
+            r = (SafeLoad(x, y-1) + SafeLoad(x, y+1)) * 0.5f;
         }
     }
-    
-    // Ӧ�ð�ƽ��
-    r *= whiteBalanceR;
-    g *= whiteBalanceG;
-    b *= whiteBalanceB;
-    
-    // �����Ѿ��� 0-1 ��Χ�� float���� 16-bit ���ݹ�һ��������
-    // ֱ��ʹ�ã������ٴι�һ��
-    
-    // ��� BGRA ��ʽ
-    OutputTexture[pos] = float4(b, g, r, 1.0);
+
+    r = saturate(r * whiteBalanceR);
+    g = saturate(g * whiteBalanceG);
+    b = saturate(b * whiteBalanceB);
+
+    OutputTexture[int2(x, y)] = float4(b, g, r, 1.0f);
 }
 )";
 	}
-
 } // namespace LightroomCore
