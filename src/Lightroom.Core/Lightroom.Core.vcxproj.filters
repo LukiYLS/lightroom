@@ -81,6 +81,9 @@
     <ClCompile Include="ImageProcessing\StandardImageLoader.cpp">
       <Filter>ImageProcessing</Filter>
     </ClCompile>
+    <ClCompile Include="ImageProcessing\ImageExporter.cpp">
+      <Filter>ImageProcessing</Filter>
+    </ClCompile>
     <ClCompile Include="VideoProcessing\LightroomSDK_Video.cpp">
       <Filter>VideoProcessing</Filter>
     </ClCompile>
@@ -128,6 +131,9 @@
       <Filter>ImageProcessing</Filter>
     </ClInclude>
     <ClInclude Include="ImageProcessing\StandardImageLoader.h">
+      <Filter>ImageProcessing</Filter>
+    </ClInclude>
+    <ClInclude Include="ImageProcessing\ImageExporter.h">
       <Filter>ImageProcessing</Filter>
     </ClInclude>
     <ClInclude Include="VideoProcessing\VideoLoader.h">

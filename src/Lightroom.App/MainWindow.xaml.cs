@@ -81,15 +81,71 @@ namespace Lightroom.App
 
         private void TopMenuBar_ExportRequested(object? sender, EventArgs e)
         {
+            System.Diagnostics.Debug.WriteLine("[MainWindow] Export requested");
+            
+            // 检查是否有渲染目标
+            var renderHandle = ImageEditorViewControl.GetRenderTargetHandle();
+            System.Diagnostics.Debug.WriteLine($"[MainWindow] Render target handle: {renderHandle}");
+            
+            if (renderHandle == IntPtr.Zero)
+            {
+                System.Windows.MessageBox.Show("没有可导出的图片", "导出", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
             var dialog = new Microsoft.Win32.SaveFileDialog
             {
-                Filter = "JPEG文件|*.jpg|PNG文件|*.png|TIFF文件|*.tiff|所有文件|*.*"
+                Filter = "JPEG文件|*.jpg|PNG文件|*.png|所有文件|*.*",
+                DefaultExt = "jpg"
             };
 
             if (dialog.ShowDialog() == true)
             {
-                // TODO: 实现导出功能
-                System.Windows.MessageBox.Show($"导出到: {dialog.FileName}", "导出", MessageBoxButton.OK, MessageBoxImage.Information);
+                try
+                {
+                    // 从文件扩展名确定格式
+                    string filePath = dialog.FileName;
+                    string extension = System.IO.Path.GetExtension(filePath).ToLower();
+                    string format = "jpeg"; // 默认格式
+                    uint quality = 90; // 默认质量
+
+                    if (extension == ".png")
+                    {
+                        format = "png";
+                    }
+                    else if (extension == ".jpg" || extension == ".jpeg")
+                    {
+                        format = "jpeg";
+                        quality = 90; // JPEG 质量
+                    }
+                    else
+                    {
+                        // 如果没有扩展名或扩展名不支持，根据过滤器选择格式
+                        // 这里可以根据需要添加更多格式支持
+                        format = "jpeg";
+                    }
+
+                    System.Diagnostics.Debug.WriteLine($"[MainWindow] Exporting to: {filePath}, format: {format}, quality: {quality}");
+
+                    // 调用 SDK 导出函数
+                    bool success = NativeMethods.ExportImage(renderHandle, filePath, format, quality);
+                    
+                    System.Diagnostics.Debug.WriteLine($"[MainWindow] Export result: {success}");
+                    
+                    if (success)
+                    {
+                        System.Windows.MessageBox.Show($"图片已成功导出到:\n{filePath}", "导出成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        System.Windows.MessageBox.Show("导出失败，请检查文件路径和权限", "导出失败", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[MainWindow] Export exception: {ex.Message}\n{ex.StackTrace}");
+                    System.Windows.MessageBox.Show($"导出时发生错误:\n{ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
             }
         }
 

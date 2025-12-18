@@ -162,6 +162,7 @@ if exist "$(ProjectDir)..\..\third_party\ffmpeg\bin\*.dll" copy /Y "$(ProjectDir
     <ClInclude Include="ImageProcessing\RAWImageInfo.h" />
     <ClInclude Include="ImageProcessing\RAWImageLoader.h" />
     <ClInclude Include="ImageProcessing\StandardImageLoader.h" />
+    <ClInclude Include="ImageProcessing\ImageExporter.h" />
     <ClInclude Include="VideoProcessing\VideoLoader.h" />
     <ClInclude Include="VideoProcessing\FFmpegVideoLoader.h" />
     <ClInclude Include="VideoProcessing\FFmpegHardwareVideoLoader.h" />
@@ -183,6 +184,7 @@ if exist "$(ProjectDir)..\..\third_party\ffmpeg\bin\*.dll" copy /Y "$(ProjectDir
     <ClCompile Include="ImageProcessing\LibRawWrapper.cpp" />
     <ClCompile Include="ImageProcessing\RAWImageLoader.cpp" />
     <ClCompile Include="ImageProcessing\StandardImageLoader.cpp" />
+    <ClCompile Include="ImageProcessing\ImageExporter.cpp" />
     <ClCompile Include="VideoProcessing\FFmpegVideoLoader.cpp" />
     <ClCompile Include="VideoProcessing\FFmpegHardwareVideoLoader.cpp" />
     <ClCompile Include="VideoProcessing\FFmpegSoftwareVideoLoader.cpp" />

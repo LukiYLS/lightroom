@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <cstdint>
 #include "LightroomSDKTypes.h"
@@ -121,5 +121,14 @@ extern "C" {
     // filePath: 文件路径（UTF-8 编码）
     // 返回是否为视频格式
     LIGHTROOM_API bool IsVideoFormat(const char* filePath);
+    
+    // 导出图片相关 API
+    // 从渲染目标导出图片到文件
+    // renderTargetHandle: 渲染目标句柄
+    // filePath: 输出文件路径（UTF-8 编码）
+    // format: 导出格式（"png" 或 "jpeg"）
+    // quality: JPEG 质量（1-100，仅对 JPEG 有效，PNG 忽略此参数）
+    // 返回是否成功
+    LIGHTROOM_API bool ExportImage(void* renderTargetHandle, const char* filePath, const char* format, uint32_t quality);
 }
 
