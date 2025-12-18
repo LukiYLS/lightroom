@@ -20,9 +20,7 @@
         <controls:TopMenuBar x:Name="TopMenuBarControl" 
                             Grid.Row="0"
                             ImportPhotosRequested="TopMenuBar_ImportPhotosRequested"
-                            ExportRequested="TopMenuBar_ExportRequested"
-                            LibraryModeRequested="TopMenuBar_LibraryModeRequested"
-                            DevelopModeRequested="TopMenuBar_DevelopModeRequested"/>
+                            ExportRequested="TopMenuBar_ExportRequested"/>
         
         <!-- Main Content Area -->
         <Grid Grid.Row="1">

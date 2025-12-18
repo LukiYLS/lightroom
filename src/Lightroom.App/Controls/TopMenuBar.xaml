@@ -78,16 +78,6 @@
                     </Style>
                 </Button.Style>
             </Button>
-            <Button Content="Library" Padding="10,5" 
-                    Background="#0078D4" Foreground="White" 
-                    BorderThickness="0" 
-                    Click="LibraryMode_Click"
-                    x:Name="LibraryButton"/>
-            <Button Content="Develop" Padding="10,5" Margin="5,0,0,0"
-                    Background="#0078D4" Foreground="White" 
-                    BorderThickness="0" 
-                    Click="DevelopMode_Click"
-                    x:Name="DevelopButton"/>
         </StackPanel>
     </Grid>
 </UserControl>

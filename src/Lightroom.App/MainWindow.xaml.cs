@@ -148,21 +148,7 @@ namespace Lightroom.App
                 }
             }
         }
-
-        private void TopMenuBar_LibraryModeRequested(object? sender, EventArgs e)
-        {
-            // 切换到 Library 模式
-            TopMenuBarControl.LibraryButton.Background = System.Windows.Media.Brushes.DarkBlue;
-            TopMenuBarControl.DevelopButton.Background = System.Windows.Media.Brushes.Transparent;
-        }
-
-        private void TopMenuBar_DevelopModeRequested(object? sender, EventArgs e)
-        {
-            // 切换到 Develop 模式
-            TopMenuBarControl.LibraryButton.Background = System.Windows.Media.Brushes.Transparent;
-            TopMenuBarControl.DevelopButton.Background = System.Windows.Media.Brushes.DarkBlue;
-        }
-
+        
         // LeftPanel Events
         private void LeftPanel_FolderSelected(object? sender, string folderPath)
         {

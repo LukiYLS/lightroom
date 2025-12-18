@@ -87,23 +87,15 @@ namespace LightroomCore {
         };
 
         float4 main(float4 position : SV_POSITION, float2 texCoord : TEXCOORD0) : SV_Target {
-            // 1. ���� Y (Limited Range ת��)
             float y_raw = YTexture.Sample(LinearSampler, texCoord).r;
             float y = (y_raw - 0.062745) * 1.16438; 
-
-            // 2. ���� UV
             float2 uv_raw = UVTexture.Sample(LinearSampler, texCoord).rg;
-             float u = uv_raw.r - 0.5;
-             float v = uv_raw.g - 0.5;
+            float u = uv_raw.r - 0.5;
+            float v = uv_raw.g - 0.5;
 
-            // 3. YUV ת RGB (BT.601)
             float r = y + 1.596 * v;
             float g = y - 0.391 * u - 0.813 * v;
             float b = y + 2.018 * u;
-
-            // 4. ���
-            // ȷ�����˳���� float4(r, g, b, 1.0)
-            // ��� DirectX Ĭ�� RT �� BGRA���������Ҫ return float4(b, g, r, 1.0);
             return float4(r, g, b, 1.0);
         }
     )";
@@ -122,26 +114,19 @@ namespace LightroomCore {
             };
 
             float4 main(float4 position : SV_POSITION, float2 texCoord : TEXCOORD0) : SV_Target {
-                // 1. ���� Y ������ Limited Range (16-235 -> 0-255)
-                // ������ NV12 Shader һ�µ��߼�
                 float y_raw = YTexture.Sample(LinearSampler, texCoord).r;
                 float y = (y_raw - 0.062745) * 1.16438;
 
-                // 2. ���� U �� V (YUV420P �������������������ǵ�ͨ�� R8)
                 float u_raw = UTexture.Sample(LinearSampler, texCoord).r;
                 float v_raw = VTexture.Sample(LinearSampler, texCoord).r;
 
                 float u = u_raw - 0.5;
                 float v = v_raw - 0.5;
 
-                // 3. YUV ת RGB (BT.601 Limited Range ϵ��)
-                // ��Ȼ NV12 ������ϵ���ǶԵģ�����Ҳ����������
                 float r = y + 1.596 * v;
                 float g = y - 0.391 * u - 0.813 * v;
                 float b = y + 2.018 * u;
 
-                // 4. ���
-                // ����Ϊ RGB ˳���� NV12 ����һ��
                 return float4(r, g, b, 1.0);
             }
         )";
