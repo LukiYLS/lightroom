@@ -18,6 +18,8 @@
 #include <memory>
 #include <cstring>
 #include <algorithm>
+#include <thread>
+#include <chrono>
 
 #include "d3d11rhi/Common.h"
 #include "d3d11rhi/DynamicRHI.h"
@@ -902,43 +904,6 @@ bool ExportImage(void* renderTargetHandle, const char* filePath, const char* for
         return false;
     }
     
-    // 确保渲染已完成（执行渲染图）
-    if (data->RenderGraph && data->bHasImage && data->ImageTexture) {
-        // 获取渲染目标尺寸
-        uint32_t width = renderTargetInfo->Width;
-        uint32_t height = renderTargetInfo->Height;
-        
-        // 执行渲染图，确保输出纹理是最新的
-        if (!data->RenderGraph->Execute(data->ImageTexture, renderTargetInfo->RHITexture, width, height)) {
-            return false;
-        }
-        
-        // 确保渲染命令已提交到 GPU 并完成
-        auto commandContext = g_DynamicRHI->GetDefaultCommandContext();
-        if (commandContext) {
-            commandContext->FlushCommands();
-        }
-        
-        // 确保 D3D11 命令已提交到 GPU
-        RenderCore::D3D11DynamicRHI* d3d11RHI = dynamic_cast<RenderCore::D3D11DynamicRHI*>(g_DynamicRHI.get());
-        if (d3d11RHI) {
-            ID3D11DeviceContext* d3d11Context = d3d11RHI->GetDeviceContext();
-            if (d3d11Context) {
-                d3d11Context->Flush();
-            }
-        }
-    }
-    
-    // 直接使用 D3D11SharedTexture（这是实际渲染的纹理）
-    ID3D11Texture2D* d3d11Texture = renderTargetInfo->D3D11SharedTexture.Get();
-    if (!d3d11Texture) {
-        return false;
-    }
-    
-    // 验证纹理是否有效
-    D3D11_TEXTURE2D_DESC texDesc;
-    d3d11Texture->GetDesc(&texDesc);
-    
     // 确定导出格式
     std::string formatStr(format);
     std::transform(formatStr.begin(), formatStr.end(), formatStr.begin(), ::tolower);
@@ -956,21 +921,81 @@ bool ExportImage(void* renderTargetHandle, const char* filePath, const char* for
     if (quality < 1) quality = 1;
     if (quality > 100) quality = 100;
     
+    // 如果没有图片，无法导出
+    if (!data->bHasImage || !data->ImageTexture) {
+        return false;
+    }
+    
+    // 获取原图分辨率（用于导出）
+    auto originalSize = data->ImageTexture->GetSize();
+    uint32_t originalWidth = originalSize.x;
+    uint32_t originalHeight = originalSize.y;
+    
+    // 创建原图分辨率的临时渲染目标纹理（用于导出）
+    auto exportTexture = g_DynamicRHI->RHICreateTexture2D(
+        RenderCore::EPixelFormat::PF_B8G8R8A8,
+        RenderCore::ETextureCreateFlags::TexCreate_RenderTargetable | RenderCore::ETextureCreateFlags::TexCreate_ShaderResource,
+        originalWidth,
+        originalHeight,
+        1  // NumMips
+    );
+    
+    if (!exportTexture) {
+        return false;
+    }
+    
+    // 将渲染图执行到原图分辨率的纹理上
+    if (data->RenderGraph) {
+        if (!data->RenderGraph->Execute(data->ImageTexture, exportTexture, originalWidth, originalHeight)) {
+            return false;
+        }
+        
+        // 确保渲染命令已提交到 GPU 并完成
+        auto commandContext = g_DynamicRHI->GetDefaultCommandContext();
+        if (commandContext) {
+            commandContext->FlushCommands();
+        }
+        
+        // 确保 D3D11 命令已提交到 GPU 并等待完成
+        RenderCore::D3D11DynamicRHI* d3d11RHI = dynamic_cast<RenderCore::D3D11DynamicRHI*>(g_DynamicRHI.get());
+        if (d3d11RHI) {
+            ID3D11DeviceContext* d3d11Context = d3d11RHI->GetDeviceContext();
+            if (d3d11Context) {
+                d3d11Context->Flush();
+            }
+        }
+    } else {
+        // 如果没有渲染图，直接复制原图
+        // 这里可以添加直接复制逻辑，或者返回 false
+        return false;
+    }
+    
+    // 获取导出纹理的 D3D11 原生纹理
+    auto d3d11ExportTexture = std::dynamic_pointer_cast<RenderCore::D3D11Texture2D>(exportTexture);
+    if (!d3d11ExportTexture) {
+        return false;
+    }
+    
+    ID3D11Texture2D* d3d11Texture = d3d11ExportTexture->GetNativeTex();
+    if (!d3d11Texture) {
+        return false;
+    }
+    
     // 创建导出器并导出
     try {
         LightroomCore::ImageExporter exporter(g_DynamicRHI);
         
-        // 从 D3D11 纹理读取数据
-		uint32_t realWidth, realHeight, stride; // 使用新变量
-		std::vector<uint8_t> imageData;
+        // 从 D3D11 纹理读取数据（原图分辨率）
+        uint32_t realWidth, realHeight, stride;
+        std::vector<uint8_t> imageData;
 
-		// 调用函数。注意：ReadD3D11TextureData 会更新 realWidth/realHeight 为 GPU 实际大小
-		if (!exporter.ReadD3D11TextureData(d3d11Texture, realWidth, realHeight, imageData, stride)) {
-			return false;
-		}
+        // 调用函数读取原图分辨率的数据
+        if (!exporter.ReadD3D11TextureData(d3d11Texture, realWidth, realHeight, imageData, stride)) {
+            return false;
+        }
 
-		// 保存时必须传 realWidth, realHeight
-		return exporter.SaveImageDataWithWIC(filePath, imageData.data(), realWidth, realHeight, stride, exportFormat, quality);
+        // 保存原图分辨率的数据
+        return exporter.SaveImageDataWithWIC(filePath, imageData.data(), realWidth, realHeight, stride, exportFormat, quality);
     }
     catch (const std::exception& e) {
         return false;
