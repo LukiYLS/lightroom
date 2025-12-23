@@ -5,21 +5,27 @@
 #include "ImageProcessing/ImageLoader.h"
 #include "ImageProcessing/RAWImageInfo.h"
 #include "ImageProcessing/ImageExporter.h"
+#include "ImageProcessing/ImagePyramid.h"
+#include "ImageProcessing/GPUTileCache.h"
+#include "ImageProcessing/TileLoader.h"
 #include "RenderTargetManager.h"
 #include "RenderGraph.h"
 #include "RenderNodes/RenderNode.h"
 #include "RenderNodes/ScaleNode.h"
 #include "RenderNodes/ImageAdjustNode.h"
 #include "RenderNodes/FilterNode.h"
+#include "RenderNodes/TileRenderNode.h"
 #include "VideoProcessing/VideoProcessor.h"
 #include <iostream>
 #include <string>
+#include <sstream>
 #include <unordered_map>
 #include <memory>
 #include <cstring>
 #include <algorithm>
 #include <thread>
 #include <chrono>
+#include <Windows.h>
 
 #include "d3d11rhi/Common.h"
 #include "d3d11rhi/DynamicRHI.h"
@@ -146,6 +152,26 @@ void DestroyRenderTarget(void* renderTargetHandle) {
     if (!renderTargetHandle) return;
     
     // 清理渲染目标数据
+    auto it = g_RenderTargetData.find(renderTargetHandle);
+    if (it != g_RenderTargetData.end()) {
+        auto& data = it->second;
+        if (data) {
+            // 清理Tile加载器
+            if (data->TileLoader) {
+                data->TileLoader.reset();
+            }
+            
+            // 清理Tile Cache
+            if (data->TileCache) {
+                data->TileCache->Shutdown();
+                data->TileCache.reset();
+            }
+            
+            // 清理图像金字塔
+            data->ImagePyramid.reset();
+        }
+    }
+    
     g_RenderTargetData.erase(renderTargetHandle);
     
     // 销毁渲染目标
@@ -204,10 +230,38 @@ bool LoadImageToTarget(void* renderTargetHandle, const char* imagePath) {
             uint32_t imageWidth, imageHeight;
             g_ImageProcessor->GetLastImageSize(imageWidth, imageHeight);
             
+            // 判断是否使用分块渲染（大图优化）
+            // 如果图像尺寸超过阈值（例如4096x4096），启用分块渲染
+            const uint32_t TILED_RENDERING_THRESHOLD = 4096;
+            bool useTiledRendering = (imageWidth > TILED_RENDERING_THRESHOLD || 
+                                     imageHeight > TILED_RENDERING_THRESHOLD);
+            
+            if (useTiledRendering) {
+                // 初始化图像金字塔
+                data->ImagePyramid = std::make_shared<ImagePyramid>();
+                if (data->ImagePyramid->Initialize(imageWidth, imageHeight, imagePath)) {
+                    // 初始化GPU Tile Cache（默认1GB）
+                    data->TileCache = std::make_shared<GPUTileCache>();
+                    if (data->TileCache->Initialize(g_DynamicRHI, 1024)) {
+                        // 初始化Tile加载器
+                        data->TileLoader = std::make_unique<TileLoader>();
+                        if (data->TileLoader->Initialize(data->ImagePyramid, data->TileCache)) {
+                            data->bUseTiledRendering = true;
+                            
+                            std::cout << "[LoadImageToTarget] Enabled tiled rendering for large image: " 
+                                      << imageWidth << "x" << imageHeight << std::endl;
+                        }
+                    }
+                }
+            } else {
+                data->bUseTiledRendering = false;
+            }
+            
             // 清除旧的渲染图
             data->RenderGraph->Clear();
             
-            // 添加通用的图像调整节点（适用于 RAW 和标准图片）
+            // 暂时禁用Tile渲染，先调试CalculateVisibleTiles
+            // 传统路径：先图像调整，后缩放
             auto adjustNode = std::make_shared<ImageAdjustNode>(g_DynamicRHI);
             ImageAdjustParams defaultParams;
             memset(&defaultParams, 0, sizeof(ImageAdjustParams));
@@ -215,10 +269,21 @@ bool LoadImageToTarget(void* renderTargetHandle, const char* imagePath) {
             adjustNode->SetAdjustParams(defaultParams);
             data->RenderGraph->AddNode(adjustNode);
             
-            // 总是添加缩放节点以支持缩放和平移功能
+            // 使用传统的缩放节点
             auto scaleNode = std::make_shared<ScaleNode>(g_DynamicRHI);
             scaleNode->SetInputImageSize(imageWidth, imageHeight);
             data->RenderGraph->AddNode(scaleNode);
+            
+            // 如果启用Tile渲染，添加TileRenderNode用于调试（但不实际渲染）
+            if (useTiledRendering && data->ImagePyramid && data->TileCache) {
+                auto tileRenderNode = std::make_shared<TileRenderNode>(g_DynamicRHI);
+                std::shared_ptr<TileLoader> sharedLoader(data->TileLoader.get(), [](TileLoader*) {
+                    // 空deleter，因为unique_ptr会管理生命周期
+                });
+                tileRenderNode->SetTileResources(data->ImagePyramid, data->TileCache, sharedLoader);
+                tileRenderNode->SetInputImageSize(imageWidth, imageHeight);
+                // 暂时不添加到RenderGraph，只在RenderToTarget中调用用于调试
+            }
             
         }
         
@@ -296,6 +361,121 @@ void RenderToTarget(void* renderTargetHandle) {
         
         // 如果有图片，执行渲染图
         if (data->bHasImage && data->ImageTexture) {
+            // 如果使用分块渲染，需要特殊处理
+            if (data->bUseTiledRendering && data->ImagePyramid && data->TileCache && data->TileLoader) {
+                // 获取当前缩放参数（从ScaleNode）
+                // 注意：这些值是从ScaleNode中读取的，不是写死的默认值
+                double zoomLevel = 1.0;
+                double panX = 0.0, panY = 0.0;
+                
+                // 从RenderGraph中查找ScaleNode以获取缩放参数
+                bool foundScaleNode = false;
+                for (size_t i = 0; i < data->RenderGraph->GetNodeCount(); ++i) {
+                    auto node = data->RenderGraph->GetNode(i);
+                    if (node && strcmp(node->GetName(), "Scale") == 0) {
+                        auto scaleNode = std::dynamic_pointer_cast<ScaleNode>(node);
+                        if (scaleNode) {
+                            // 从ScaleNode获取当前设置的缩放和平移参数（这些值是由SetRenderTargetZoom设置的）
+                            scaleNode->GetZoomParams(zoomLevel, panX, panY);
+                            foundScaleNode = true;
+                            
+                            // 调试输出：显示获取到的参数
+                            std::ostringstream oss;
+                            oss << "[RenderToTarget] Got zoom params from ScaleNode: "
+                                << "Zoom=" << zoomLevel << ", Pan=(" << panX << "," << panY << ")\n";
+                            OutputDebugStringA(oss.str().c_str());
+                            break;
+                        }
+                    }
+                }
+                
+                if (!foundScaleNode) {
+                    std::ostringstream oss;
+                    oss << "[RenderToTarget] Warning: ScaleNode not found, using default values: "
+                        << "Zoom=" << zoomLevel << ", Pan=(" << panX << "," << panY << ")\n";
+                    OutputDebugStringA(oss.str().c_str());
+                }
+                
+                // 调试输出：显示传递给CalculateVisibleTiles的参数
+                {
+                    std::ostringstream oss;
+                    oss << "[RenderToTarget] Calling CalculateVisibleTiles with: "
+                        << "Zoom=" << zoomLevel << ", Pan=(" << panX << "," << panY << "), "
+                        << "Viewport=" << renderTargetInfo->Width << "x" << renderTargetInfo->Height << "\n";
+                    OutputDebugStringA(oss.str().c_str());
+                }
+                
+                // 使用优化的批量Tile管理
+                if (data->ImagePyramid && data->TileLoader && data->TileCache) {
+                    // 获取原始图像尺寸
+                    uint32_t imageWidth, imageHeight;
+                    data->ImagePyramid->GetOriginalSize(imageWidth, imageHeight);
+                    
+                    // 1. 计算可见Tiles
+                    std::vector<TileCoordinate> visibleTiles;
+                    data->ImagePyramid->CalculateVisibleTiles(
+                        imageWidth, imageHeight,  // 原始图像尺寸
+                        0, 0,  // viewport offset (屏幕像素坐标，暂时设为0，因为视口通常是整个窗口)
+                        renderTargetInfo->Width, renderTargetInfo->Height,  // viewport尺寸
+                        zoomLevel, panX, panY,  // 这些值是从ScaleNode读取的，不是写死的
+                        visibleTiles
+                    );
+                    
+                    if (!visibleTiles.empty()) {
+                    
+                    // 2. 批量请求Tiles（区分已在GPU中的和需要加载的）
+                    std::vector<TileCoordinate> tilesToLoad;
+                    std::vector<std::pair<TileCoordinate, int32_t>> tilesInGPU;
+                    data->TileCache->BatchRequestTiles(visibleTiles, tilesToLoad, tilesInGPU);
+                    
+                    // 3. 加载需要加载的Tiles（同步，后续可以改为异步）
+                    if (!tilesToLoad.empty()) {
+                        // 加载tile数据
+                        std::vector<std::pair<TileCoordinate, const uint8_t*>> tilesToUpdate;
+                        
+                        for (const auto& coord : tilesToLoad) {
+                            // 从ImagePyramid获取tile数据
+                            TileData tileData;
+                            if (data->ImagePyramid->GetTileData(coord, tileData) && tileData.bLoaded) {
+                                tilesToUpdate.push_back({coord, tileData.Data.data()});
+                            } else {
+                                // 需要从磁盘加载（这里简化处理，实际应该异步）
+                                std::vector<uint8_t> tileDataBuffer;
+                                if (data->TileLoader->LoadTileData(coord, tileDataBuffer)) {
+                                    // 标记为已加载
+                                    data->ImagePyramid->MarkTileLoaded(coord, tileDataBuffer.data(), tileDataBuffer.size());
+                                    
+                                    // 获取数据指针（注意：这里需要确保数据在UpdateTileData调用时仍然有效）
+                                    // 简化处理：直接使用tileDataBuffer的数据指针
+                                    // 实际应该使用持久化的存储
+                                    static std::vector<std::vector<uint8_t>> s_TileDataStorage;  // 临时存储
+                                    s_TileDataStorage.push_back(std::move(tileDataBuffer));
+                                    tilesToUpdate.push_back({coord, s_TileDataStorage.back().data()});
+                                }
+                            }
+                        }
+                        
+                        // 批量更新到GPU
+                        if (!tilesToUpdate.empty()) {
+                            uint32_t updatedCount = data->TileCache->BatchUpdateTileData(tilesToUpdate);
+                            std::ostringstream oss;
+                            oss << "[RenderToTarget] Batch updated " << updatedCount 
+                                << " tiles to GPU (out of " << tilesToUpdate.size() << " requested)\n";
+                            OutputDebugStringA(oss.str().c_str());
+                        }
+                    }
+                    
+                        // 4. 调试输出：显示已在GPU中的tiles
+                        if (!tilesInGPU.empty()) {
+                            std::ostringstream oss;
+                            oss << "[RenderToTarget] " << tilesInGPU.size() 
+                                << " tiles already in GPU cache\n";
+                            OutputDebugStringA(oss.str().c_str());
+                        }
+                    }
+                }
+            }
+            
             // 获取输出纹理（从 RenderTargetManager）
             auto outputTexture = g_RenderTargetManager->GetRHITexture(renderTargetHandle);
             if (!outputTexture) {
@@ -303,8 +483,9 @@ void RenderToTarget(void* renderTargetHandle) {
             }
             
             // 执行渲染图
+            // 如果使用Tile渲染，inputTexture可能不会被使用（TileRenderNode使用TileCache）
             if (!data->RenderGraph->Execute(
-                    data->ImageTexture,  // 输入：加载的图片纹理
+                    data->ImageTexture,  // 输入：加载的图片纹理（Tile渲染时可能不使用）
                     outputTexture,       // 输出：渲染目标纹理
                     renderTargetInfo->Width,
                     renderTargetInfo->Height)) {
@@ -392,32 +573,57 @@ void SetRenderTargetZoom(void* renderTargetHandle, double zoomLevel, double panX
         return;
     }
     
-    // 查找 ScaleNode 并设置缩放参数
+    // 查找渲染节点并设置缩放参数（可能是ScaleNode或TileRenderNode）
     for (size_t i = 0; i < data->RenderGraph->GetNodeCount(); ++i) {
         auto node = data->RenderGraph->GetNode(i);
-        if (node && strcmp(node->GetName(), "Scale") == 0) {
-            // 转换为 ScaleNode
-            auto scaleNode = std::dynamic_pointer_cast<ScaleNode>(node);
-            if (scaleNode) {
-                scaleNode->SetZoomParams(zoomLevel, panX, panY);
-                
-                // 如果已加载图片，设置输入图片尺寸
-                if (data->bHasImage && data->ImageTexture) {
-                    if (data->bIsVideo) {
-                        // 视频
-                        const LightroomCore::VideoMetadata* metadata = data->VideoProcessor->GetMetadata();
-                        if (metadata) {
-                            scaleNode->SetInputImageSize(metadata->width, metadata->height);
+        if (node) {
+            if (strcmp(node->GetName(), "Scale") == 0) {
+                // 转换为 ScaleNode
+                auto scaleNode = std::dynamic_pointer_cast<ScaleNode>(node);
+                if (scaleNode) {
+                    scaleNode->SetZoomParams(zoomLevel, panX, panY);
+                    
+                    // 如果已加载图片，设置输入图片尺寸
+                    if (data->bHasImage && data->ImageTexture) {
+                        if (data->bIsVideo) {
+                            // 视频
+                            const LightroomCore::VideoMetadata* metadata = data->VideoProcessor->GetMetadata();
+                            if (metadata) {
+                                scaleNode->SetInputImageSize(metadata->width, metadata->height);
+                            }
+                        } else {
+                            // 图片
+                            uint32_t imageWidth, imageHeight;
+                            g_ImageProcessor->GetLastImageSize(imageWidth, imageHeight);
+                            scaleNode->SetInputImageSize(imageWidth, imageHeight);
                         }
-                    } else {
-                        // 图片
-                        uint32_t imageWidth, imageHeight;
-                        g_ImageProcessor->GetLastImageSize(imageWidth, imageHeight);
-                        scaleNode->SetInputImageSize(imageWidth, imageHeight);
                     }
                 }
+                break;
+            } else if (strcmp(node->GetName(), "TileRender") == 0) {
+                // 转换为 TileRenderNode
+                auto tileNode = std::dynamic_pointer_cast<TileRenderNode>(node);
+                if (tileNode) {
+                    tileNode->SetZoomParams(zoomLevel, panX, panY);
+                    
+                    // 如果已加载图片，设置输入图片尺寸
+                    if (data->bHasImage) {
+                        if (data->bIsVideo) {
+                            // 视频
+                            const LightroomCore::VideoMetadata* metadata = data->VideoProcessor->GetMetadata();
+                            if (metadata) {
+                                tileNode->SetInputImageSize(metadata->width, metadata->height);
+                            }
+                        } else {
+                            // 图片
+                            uint32_t imageWidth, imageHeight;
+                            g_ImageProcessor->GetLastImageSize(imageWidth, imageHeight);
+                            tileNode->SetInputImageSize(imageWidth, imageHeight);
+                        }
+                    }
+                }
+                break;
             }
-            break;
         }
     }
 }

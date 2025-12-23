@@ -8,6 +8,9 @@
 #include "RenderGraph.h"
 #include "ImageProcessing/ImageLoader.h"
 #include "ImageProcessing/RAWImageInfo.h"
+#include "ImageProcessing/ImagePyramid.h"
+#include "ImageProcessing/GPUTileCache.h"
+#include "ImageProcessing/TileLoader.h"
 #include "VideoProcessing/VideoProcessor.h"
 #include <memory>
 #include <unordered_map>
@@ -30,11 +33,21 @@ struct RenderTargetData {
     LightroomCore::ImageFormat ImageFormat;      // 图片格式（Standard 或 RAW）
     std::unique_ptr<LightroomCore::RAWImageInfo> RAWInfo;  // RAW 信息（仅在 RAW 格式时有效）
     
+    // 图像金字塔和Tile缓存（用于大图优化）
+    std::shared_ptr<LightroomCore::ImagePyramid> ImagePyramid;
+    std::shared_ptr<LightroomCore::GPUTileCache> TileCache;
+    std::unique_ptr<LightroomCore::TileLoader> TileLoader;
+    bool bUseTiledRendering;  // 是否使用分块渲染（大图时启用）
+    
     // 视频相关
     std::unique_ptr<LightroomCore::VideoProcessor> VideoProcessor;
     bool bIsVideo;
     
-    RenderTargetData() : bHasImage(false), ImageFormat(LightroomCore::ImageFormat::Unknown), bIsVideo(false) {}
+    RenderTargetData() 
+        : bHasImage(false)
+        , ImageFormat(LightroomCore::ImageFormat::Unknown)
+        , bUseTiledRendering(false)
+        , bIsVideo(false) {}
 };
 
 // 前向声明

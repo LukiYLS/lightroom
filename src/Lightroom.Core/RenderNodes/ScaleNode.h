@@ -29,6 +29,9 @@ public:
     // panX, panY: 平移偏移（归一化坐标，范围 -1.0 到 1.0）
     void SetZoomParams(double zoomLevel, double panX, double panY);
 
+    // 获取缩放参数
+    void GetZoomParams(double& zoomLevel, double& panX, double& panY) const;
+
     // 设置输入图片尺寸（用于计算正确的缩放和平移）
     void SetInputImageSize(uint32_t width, uint32_t height);
 

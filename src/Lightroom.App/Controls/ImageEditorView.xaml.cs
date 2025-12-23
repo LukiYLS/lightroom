@@ -17,6 +17,8 @@ namespace Lightroom.App.Controls
         private DispatcherTimer? _renderTimer = null;
         private System.Windows.Interop.D3DImage? _d3dImage = null;
         private double _zoomLevel = 1.0;
+        private double _panX = 0.0;  // 当前平移X（归一化坐标）
+        private double _panY = 0.0;  // 当前平移Y（归一化坐标）
         private string? _currentImagePath = null;
         private bool _isVideo = false;
         private bool _isPlaying = false;
@@ -385,11 +387,24 @@ namespace Lightroom.App.Controls
             // 调用 SDK 设置缩放参数
             if (_renderTargetHandle != IntPtr.Zero)
             {
-                // 计算平移偏移（当前为 0，后续可以添加平移功能）
-                double panX = 0.0;
-                double panY = 0.0;
+                // 缩放时保持之前的平移值，而不是总是重置为 0
+                // 这样，如果用户之前拖拽过图片，pan 值会被保留
+                // 注意：如果需要实现"以鼠标位置为中心缩放"，需要根据缩放中心计算新的平移值
+                // 当前实现：缩放时保持之前的平移值
                 
-                NativeMethods.SetRenderTargetZoom(_renderTargetHandle, _zoomLevel, panX, panY);
+                NativeMethods.SetRenderTargetZoom(_renderTargetHandle, _zoomLevel, _panX, _panY);
+            }
+        }
+        
+        // 设置平移参数（可以从外部调用，例如鼠标拖拽）
+        public void SetPan(double panX, double panY)
+        {
+            _panX = panX;
+            _panY = panY;
+            
+            if (_renderTargetHandle != IntPtr.Zero)
+            {
+                NativeMethods.SetRenderTargetZoom(_renderTargetHandle, _zoomLevel, _panX, _panY);
             }
         }
 

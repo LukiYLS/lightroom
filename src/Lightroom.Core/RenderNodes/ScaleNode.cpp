@@ -153,6 +153,12 @@ void ScaleNode::SetZoomParams(double zoomLevel, double panX, double panY) {
     m_PanY = panY;
 }
 
+void ScaleNode::GetZoomParams(double& zoomLevel, double& panX, double& panY) const {
+    zoomLevel = m_ZoomLevel;
+    panX = m_PanX;
+    panY = m_PanY;
+}
+
 void ScaleNode::SetInputImageSize(uint32_t width, uint32_t height) {
     m_InputImageWidth = width;
     m_InputImageHeight = height;
