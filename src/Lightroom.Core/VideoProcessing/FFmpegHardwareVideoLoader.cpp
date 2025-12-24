@@ -1,4 +1,4 @@
-#include "FFmpegHardwareVideoLoader.h"
+﻿#include "FFmpegHardwareVideoLoader.h"
 #include "VideoPerformanceProfiler.h"
 #include "../d3d11rhi/DynamicRHI.h"
 #include "../d3d11rhi/D3D11RHI.h"
@@ -205,10 +205,12 @@ namespace LightroomCore {
             return false;
         }
 
-        // Create hardware device context
-        int ret = av_hwdevice_ctx_create(&m_HwDeviceCtx, AV_HWDEVICE_TYPE_D3D11VA, nullptr, nullptr, 0);
-        if (ret < 0) {
-            std::cerr << "[FFmpegHardwareVideoLoader] Failed to create hardware device context" << std::endl;
+        // 关键修复：使用 av_hwdevice_ctx_alloc 而不是 av_hwdevice_ctx_create
+        // 这样可以手动分配并绑定现有的设备，而不是让 FFmpeg 创建新设备
+        // 这确保了 FFmpeg 使用与导出线程相同的设备，避免跨设备多线程问题
+        m_HwDeviceCtx = av_hwdevice_ctx_alloc(AV_HWDEVICE_TYPE_D3D11VA);
+        if (!m_HwDeviceCtx) {
+            std::cerr << "[FFmpegHardwareVideoLoader] Failed to allocate hardware device context" << std::endl;
             return false;
         }
 
@@ -216,10 +218,20 @@ namespace LightroomCore {
         AVHWDeviceContext* hwDeviceCtx = (AVHWDeviceContext*)m_HwDeviceCtx->data;
         AVD3D11VADeviceContext* d3d11vaDeviceCtx = (AVD3D11VADeviceContext*)hwDeviceCtx->hwctx;
 
-        // Set the D3D11 device (if not already set)
-        if (!d3d11vaDeviceCtx->device) {
-            d3d11vaDeviceCtx->device = d3d11Device;
-            d3d11Device->AddRef();  // FFmpeg will release it
+        // 关键：直接将传入的私有设备指针设置给 FFmpeg
+        // 这样 FFmpeg 的解码指令和导出线程的 CopyResource 指令会排在同一个设备的指令序列里
+        d3d11vaDeviceCtx->device = d3d11Device;
+        d3d11Device->AddRef();  // 增加引用计数，FFmpeg 释放时会调用 Release
+
+        // 初始化硬件设备上下文
+        int ret = av_hwdevice_ctx_init(m_HwDeviceCtx);
+        if (ret < 0) {
+            char errBuf[AV_ERROR_MAX_STRING_SIZE];
+            av_strerror(ret, errBuf, AV_ERROR_MAX_STRING_SIZE);
+            std::cerr << "[FFmpegHardwareVideoLoader] Failed to initialize hardware device context: " 
+                      << errBuf << " (error code: " << ret << ")" << std::endl;
+            av_buffer_unref(&m_HwDeviceCtx);
+            return false;
         }
 
         // Set device context for codec
@@ -296,7 +308,8 @@ namespace LightroomCore {
         framesCtx->sw_format = AV_PIX_FMT_NV12;
         framesCtx->width = m_CodecContext->width;
         framesCtx->height = m_CodecContext->height;
-        framesCtx->initial_pool_size = 20;
+        // 减小帧池大小，减轻 Intel 显存压力（从 20 改为 8）
+        framesCtx->initial_pool_size = 8;
 
         // Set D3D11VA specific parameters
         AVD3D11VAFramesContext* d3d11vaFramesCtx = (AVD3D11VAFramesContext*)framesCtx->hwctx;
@@ -356,7 +369,7 @@ namespace LightroomCore {
     }
 
     bool FFmpegHardwareVideoLoader::Seek(int64_t timestamp) {
-        if (!m_IsOpen) {
+        if (!m_IsOpen || !m_FormatContext) {
             return false;
         }
 
@@ -365,8 +378,22 @@ namespace LightroomCore {
             return false;
         }
 
+        // 刷新解码器缓冲区（确保CodecContext有效且已打开）
+        // 注意：在硬件解码器中，CodecContext 在 Open() 时分配，但 avcodec_open2 在 InitializeHardwareDecoding() 中调用
+        // InitializeHardwareDecoding() 通常在第一次 ReadNextFrame() 时调用
+        // 因此，如果 Seek 在第一次 ReadNextFrame 之前调用，CodecContext 可能还未通过 avcodec_open2 打开
+        // 在这种情况下，我们跳过 flush，因为还没有解码器缓冲区需要刷新
         if (m_CodecContext) {
-            avcodec_flush_buffers(m_CodecContext);
+            // 检查 codec_id 确保 codec 至少已分配
+            if (m_CodecContext->codec_id != AV_CODEC_ID_NONE) {
+                // 检查 codec 是否已打开（通过检查 codec 指针）
+                // 如果 codec 指针为 nullptr，说明 avcodec_open2 还未调用
+                // 在这种情况下，不需要刷新缓冲区（因为还没有缓冲区）
+                if (m_CodecContext->codec != nullptr) {
+                    avcodec_flush_buffers(m_CodecContext);
+                }
+                // 如果 codec 未打开，我们继续执行，因为 seek 操作本身已经完成
+            }
         }
         m_CurrentFrameIndex = (int64_t)((double)timestamp / m_FrameDuration);
 
@@ -468,7 +495,7 @@ namespace LightroomCore {
 
         // FFmpeg 解码一帧到 m_Frame
         {
-            ScopedTimer timer("DecodeFrame", m_CurrentFrameIndex);
+            //ScopedTimer timer("DecodeFrame", m_CurrentFrameIndex);
             if (!DecodeFrame()) {
                 return nullptr;
             }
@@ -492,7 +519,7 @@ namespace LightroomCore {
             //ID3D11Texture2D* srcTextureArray = (ID3D11Texture2D*)(uintptr_t)m_Frame->data[0];
             // 1. 使用 av_hwframe_transfer_data 将硬件帧转换为软件帧（NV12格式）
             {
-                ScopedTimer timer("HWFrameTransfer", m_CurrentFrameIndex);
+                //ScopedTimer timer("HWFrameTransfer", m_CurrentFrameIndex);
                 
                 // 先清空软件帧（确保是"clean"状态，让 av_hwframe_transfer_data 自动分配缓冲区）
                 av_frame_unref(m_SoftwareFrame);
@@ -593,7 +620,7 @@ namespace LightroomCore {
             
             // 3. 上传软件帧数据到纹理
             {
-                ScopedTimer timer("UploadToTexture", m_CurrentFrameIndex);
+                //ScopedTimer timer("UploadToTexture", m_CurrentFrameIndex);
                 
                 // NV12格式：Y平面在data[0]，UV平面在data[1]（交错存储）
                 // 需要分别上传Y和UV数据
@@ -622,30 +649,63 @@ namespace LightroomCore {
                 }
                 
                 // 映射纹理并上传数据
-                D3D11_MAPPED_SUBRESOURCE mapped;
+                D3D11_MAPPED_SUBRESOURCE mapped = {};
                 hr = context->Map(uploadTexture.Get(), 0, D3D11_MAP_WRITE, 0, &mapped);
-                if (SUCCEEDED(hr)) {
+                if (SUCCEEDED(hr) && mapped.pData != nullptr && mapped.RowPitch > 0) {
+                    // 验证源数据有效性
+                    if (!m_SoftwareFrame || !m_SoftwareFrame->data[0]) {
+                        std::cerr << "[FFmpegHardwareVideoLoader] Invalid software frame data" << std::endl;
+                        context->Unmap(uploadTexture.Get(), 0);
+                        return nullptr;
+                    }
+                    
                     // 上传Y平面
                     uint8_t* dstY = (uint8_t*)mapped.pData;
                     uint8_t* srcY = m_SoftwareFrame->data[0];
                     uint32_t yPitch = m_SoftwareFrame->linesize[0];
                     
+                    // 确保不会越界：使用较小的值
+                    uint32_t copyWidth = (width < mapped.RowPitch) ? width : mapped.RowPitch;
+                    uint32_t srcPitch = (yPitch > 0) ? yPitch : width;
+                    
+                    // 验证初始指针有效性
+                    if (dstY == nullptr || srcY == nullptr) {
+                        std::cerr << "[FFmpegHardwareVideoLoader] Null pointer before Y plane upload" << std::endl;
+                        context->Unmap(uploadTexture.Get(), 0);
+                        return nullptr;
+                    }
+                    
                     for (uint32_t y = 0; y < height; y++) {
-                        memcpy(dstY, srcY, width);
+                        memcpy(dstY, srcY, copyWidth);
                         dstY += mapped.RowPitch;
-                        srcY += yPitch;
+                        srcY += srcPitch;
                     }
                     
                     // 上传UV平面（交错存储，在Y平面之后）
+                    // 对于NV12格式，UV平面在Y平面之后，使用相同的RowPitch
+                    if (!m_SoftwareFrame->data[1]) {
+                        std::cerr << "[FFmpegHardwareVideoLoader] Invalid UV plane data" << std::endl;
+                        context->Unmap(uploadTexture.Get(), 0);
+                        return nullptr;
+                    }
+                    
                     uint8_t* dstUV = (uint8_t*)mapped.pData + mapped.RowPitch * height;
                     uint8_t* srcUV = m_SoftwareFrame->data[1];
                     uint32_t uvPitch = m_SoftwareFrame->linesize[1];
                     uint32_t uvHeight = height / 2;  // UV平面高度是Y平面的一半
+                    uint32_t uvSrcPitch = (uvPitch > 0) ? uvPitch : width;
+                    
+                    // 验证UV指针有效性
+                    if (dstUV == nullptr || srcUV == nullptr) {
+                        std::cerr << "[FFmpegHardwareVideoLoader] Null pointer before UV plane upload" << std::endl;
+                        context->Unmap(uploadTexture.Get(), 0);
+                        return nullptr;
+                    }
                     
                     for (uint32_t y = 0; y < uvHeight; y++) {
-                        memcpy(dstUV, srcUV, width);  // UV交错，宽度与Y相同
+                        memcpy(dstUV, srcUV, copyWidth);  // UV交错，宽度与Y相同
                         dstUV += mapped.RowPitch;
-                        srcUV += uvPitch;
+                        srcUV += uvSrcPitch;
                     }
                     
                     context->Unmap(uploadTexture.Get(), 0);
@@ -701,7 +761,7 @@ namespace LightroomCore {
             
             bool bSuccess = false;
             {
-                ScopedTimer timer("ColorConversion", m_CurrentFrameIndex);
+                //ScopedTimer timer("ColorConversion", m_CurrentFrameIndex);
                 bSuccess = m_CachedYUVToRGBNode->Execute(dummyWrapper, m_CachedRGBTexture, m_Frame->width, m_Frame->height);
             }
 

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <cstdint>
 #include "LightroomSDKTypes.h"
@@ -130,5 +130,24 @@ extern "C" {
     // quality: JPEG 质量（1-100，仅对 JPEG 有效，PNG 忽略此参数）
     // 返回是否成功
     LIGHTROOM_API bool ExportImage(void* renderTargetHandle, const char* filePath, const char* format, uint32_t quality);
+    
+    // 导出视频相关 API
+    // 从渲染目标导出视频到文件（MP4格式，H.265编码）
+    // renderTargetHandle: 渲染目标句柄
+    // filePath: 输出文件路径（UTF-8 编码）
+    // progressCallback: 进度回调函数指针（可选，C风格回调）
+    //   progress: 0.0 - 1.0
+    //   currentFrame: 当前处理的帧索引
+    //   totalFrames: 总帧数
+    //   userData: 用户数据指针
+    // 返回是否成功开始导出（实际导出在后台线程中进行）
+    typedef void (*VideoExportProgressCallback)(double progress, int64_t currentFrame, int64_t totalFrames, void* userData);
+    LIGHTROOM_API bool ExportVideo(void* renderTargetHandle, const char* filePath, VideoExportProgressCallback progressCallback, void* userData);
+    
+    // 检查是否正在导出视频
+    LIGHTROOM_API bool IsExportingVideo(void* renderTargetHandle);
+    
+    // 取消视频导出
+    LIGHTROOM_API void CancelVideoExport(void* renderTargetHandle);
 }
 

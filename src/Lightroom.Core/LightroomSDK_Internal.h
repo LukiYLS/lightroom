@@ -9,6 +9,7 @@
 #include "ImageProcessing/ImageLoader.h"
 #include "ImageProcessing/RAWImageInfo.h"
 #include "VideoProcessing/VideoProcessor.h"
+#include "VideoProcessing/VideoExporter.h"
 #include <memory>
 #include <unordered_map>
 
@@ -33,6 +34,10 @@ struct RenderTargetData {
     // 视频相关
     std::unique_ptr<LightroomCore::VideoProcessor> VideoProcessor;
     bool bIsVideo;
+    std::string VideoFilePath;  // 视频文件路径（UTF-8编码），用于导出时创建独立的VideoProcessor
+    
+    // 视频导出相关
+    std::unique_ptr<LightroomCore::VideoExporter> VideoExporter;
     
     RenderTargetData() : bHasImage(false), ImageFormat(LightroomCore::ImageFormat::Unknown), bIsVideo(false) {}
 };

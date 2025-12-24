@@ -12,6 +12,7 @@
 #include "RenderNodes/ImageAdjustNode.h"
 #include "RenderNodes/FilterNode.h"
 #include "VideoProcessing/VideoProcessor.h"
+#include "VideoProcessing/VideoExporter.h"
 #include <iostream>
 #include <string>
 #include <unordered_map>
@@ -999,6 +1000,89 @@ bool ExportImage(void* renderTargetHandle, const char* filePath, const char* for
     }
     catch (const std::exception& e) {
         return false;
+    }
+}
+
+bool ExportVideo(void* renderTargetHandle, const char* filePath, ::VideoExportProgressCallback progressCallback, void* userData) {
+    if (!renderTargetHandle || !filePath) {
+        return false;
+    }
+    
+    auto it = g_RenderTargetData.find(renderTargetHandle);
+    if (it == g_RenderTargetData.end() || !it->second) {
+        return false;
+    }
+    
+    auto& data = it->second;
+    
+    // 检查是否是视频
+    if (!data->bIsVideo || !data->VideoProcessor) {
+        return false;
+    }
+    
+    // 创建视频导出器（如果还没有）
+    if (!data->VideoExporter) {
+        data->VideoExporter = std::make_unique<LightroomCore::VideoExporter>();
+    }
+    
+    // 检查是否正在导出
+    if (data->VideoExporter->IsExporting()) {
+        return false;
+    }
+    
+    // 创建进度回调包装器
+    LightroomCore::VideoExportProgressCallback cppCallback = nullptr;
+    if (progressCallback) {
+        cppCallback = [progressCallback, userData](double progress, int64_t currentFrame, int64_t totalFrames) {
+            progressCallback(progress, currentFrame, totalFrames, userData);
+        };
+    }
+    
+    // 检查是否有视频文件路径
+    if (data->VideoFilePath.empty()) {
+        return false;
+    }
+    
+    // 开始导出（传入视频文件路径，导出线程会创建独立的VideoProcessor实例）
+    return data->VideoExporter->ExportVideo(
+        data->VideoFilePath,
+        data->RenderGraph.get(),
+        std::string(filePath),
+        cppCallback
+    );
+}
+
+bool IsExportingVideo(void* renderTargetHandle) {
+    if (!renderTargetHandle) {
+        return false;
+    }
+    
+    auto it = g_RenderTargetData.find(renderTargetHandle);
+    if (it == g_RenderTargetData.end() || !it->second) {
+        return false;
+    }
+    
+    auto& data = it->second;
+    if (!data->VideoExporter) {
+        return false;
+    }
+    
+    return data->VideoExporter->IsExporting();
+}
+
+void CancelVideoExport(void* renderTargetHandle) {
+    if (!renderTargetHandle) {
+        return;
+    }
+    
+    auto it = g_RenderTargetData.find(renderTargetHandle);
+    if (it == g_RenderTargetData.end() || !it->second) {
+        return;
+    }
+    
+    auto& data = it->second;
+    if (data->VideoExporter) {
+        data->VideoExporter->CancelExport();
     }
 }
 

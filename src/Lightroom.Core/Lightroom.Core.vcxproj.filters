@@ -93,6 +93,9 @@
     <ClCompile Include="VideoProcessing\VideoProcessor.cpp">
       <Filter>VideoProcessing</Filter>
     </ClCompile>
+    <ClCompile Include="VideoProcessing\VideoExporter.cpp">
+      <Filter>VideoProcessing</Filter>
+    </ClCompile>
     <ClCompile Include="RenderTargetManager.cpp" />
     <ClCompile Include="RenderGraph.cpp" />
     <ClCompile Include="RenderNodes\RenderNode.cpp">
@@ -149,6 +152,9 @@
       <Filter>VideoProcessing</Filter>
     </ClInclude>
     <ClInclude Include="VideoProcessing\VideoProcessor.h">
+      <Filter>VideoProcessing</Filter>
+    </ClInclude>
+    <ClInclude Include="VideoProcessing\VideoExporter.h">
       <Filter>VideoProcessing</Filter>
     </ClInclude>
     <ClInclude Include="RenderTargetManager.h" />

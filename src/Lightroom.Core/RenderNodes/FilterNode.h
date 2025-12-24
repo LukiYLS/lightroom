@@ -35,6 +35,10 @@ public:
     void SetIntensity(float intensity) { m_Intensity = intensity; }
     float GetIntensity() const { return m_Intensity; }
 
+    // 获取 LUT 信息（用于克隆）
+    uint32_t GetLUTSize() const { return m_LUTSize; }
+    std::shared_ptr<RenderCore::RHITexture2D> GetLUTTexture() const { return m_LUTTexture; }
+
 protected:
     // 重写基类的钩子方法
     virtual void UpdateConstantBuffers(uint32_t width, uint32_t height) override;

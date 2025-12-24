@@ -96,6 +96,7 @@ bool OpenVideo(void* renderTargetHandle, const char* videoPath) {
         data->bIsVideo = true;
         data->bHasImage = true;
         data->ImageFormat = LightroomCore::ImageFormat::Unknown; // 视频不使用 ImageFormat
+        data->VideoFilePath = std::string(videoPath);  // 保存视频文件路径，用于导出
         
         return true;
     }

@@ -1,4 +1,4 @@
-#include "FFmpegSoftwareVideoLoader.h"
+﻿#include "FFmpegSoftwareVideoLoader.h"
 #include "VideoPerformanceProfiler.h"
 #include "../d3d11rhi/DynamicRHI.h"
 #include "../d3d11rhi/D3D11RHI.h"
@@ -204,7 +204,7 @@ namespace LightroomCore {
             return false;
         }
 
-        avcodec_flush_buffers(m_CodecContext);
+                avcodec_flush_buffers(m_CodecContext);
         m_CurrentFrameIndex = (int64_t)((double)timestamp / m_FrameDuration);
 
         return true;

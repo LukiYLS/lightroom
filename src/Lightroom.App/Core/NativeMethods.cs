@@ -186,6 +186,19 @@ namespace Lightroom.App.Core
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         public static extern bool ExportImage(IntPtr renderTargetHandle, [MarshalAs(UnmanagedType.LPStr)] string filePath, [MarshalAs(UnmanagedType.LPStr)] string format, uint quality);
+
+        // 视频导出相关 API
+        // 进度回调委托
+        public delegate void VideoExportProgressDelegate(double progress, long currentFrame, long totalFrames, IntPtr userData);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        public static extern bool ExportVideo(IntPtr renderTargetHandle, [MarshalAs(UnmanagedType.LPStr)] string filePath, VideoExportProgressDelegate progressCallback, IntPtr userData);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern bool IsExportingVideo(IntPtr renderTargetHandle);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern void CancelVideoExport(IntPtr renderTargetHandle);
     }
 }
 

@@ -397,6 +397,16 @@ namespace Lightroom.App.Controls
         {
             return _renderTargetHandle;
         }
+        
+        public string? GetCurrentFilePath()
+        {
+            return _currentImagePath;
+        }
+        
+        public bool IsVideo()
+        {
+            return _isVideo;
+        }
 
         private void ImageEditorView_SizeChanged(object sender, SizeChangedEventArgs e)
         {

@@ -99,6 +99,7 @@ set(VIDEO_PROCESSING_SOURCES
     VideoProcessing/LightroomSDK_Video.cpp
     VideoProcessing/FFmpegVideoLoader.cpp
     VideoProcessing/VideoProcessor.cpp
+    VideoProcessing/VideoExporter.cpp
 )
 
 set(RENDER_NODES_SOURCES
@@ -186,6 +187,7 @@ set(VIDEO_PROCESSING_HEADERS
     VideoProcessing/VideoLoader.h
     VideoProcessing/FFmpegVideoLoader.h
     VideoProcessing/VideoProcessor.h
+    VideoProcessing/VideoExporter.h
 )
 
 set(RENDER_NODES_HEADERS

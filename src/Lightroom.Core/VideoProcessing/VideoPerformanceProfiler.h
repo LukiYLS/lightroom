@@ -145,11 +145,11 @@ namespace LightroomCore {
     public:
         ScopedTimer(const std::string& name, int64_t frameIndex = -1)
             : m_Name(name) {
-            VideoPerformanceProfiler::GetInstance().StartTiming(name, frameIndex);
+            //VideoPerformanceProfiler::GetInstance().StartTiming(name, frameIndex);
         }
 
         ~ScopedTimer() {
-            VideoPerformanceProfiler::GetInstance().EndTiming(m_Name);
+            //VideoPerformanceProfiler::GetInstance().EndTiming(m_Name);
         }
 
     private:

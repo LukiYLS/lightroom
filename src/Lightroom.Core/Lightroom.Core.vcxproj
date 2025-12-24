@@ -168,6 +168,7 @@ if exist "$(ProjectDir)..\..\third_party\ffmpeg\bin\*.dll" copy /Y "$(ProjectDir
     <ClInclude Include="VideoProcessing\FFmpegHardwareVideoLoader.h" />
     <ClInclude Include="VideoProcessing\FFmpegSoftwareVideoLoader.h" />
     <ClInclude Include="VideoProcessing\VideoProcessor.h" />
+    <ClInclude Include="VideoProcessing\VideoExporter.h" />
     <ClInclude Include="RenderTargetManager.h" />
     <ClInclude Include="RenderGraph.h" />
     <ClInclude Include="RenderNodes\RenderNode.h" />
@@ -189,6 +190,7 @@ if exist "$(ProjectDir)..\..\third_party\ffmpeg\bin\*.dll" copy /Y "$(ProjectDir
     <ClCompile Include="VideoProcessing\FFmpegHardwareVideoLoader.cpp" />
     <ClCompile Include="VideoProcessing\FFmpegSoftwareVideoLoader.cpp" />
     <ClCompile Include="VideoProcessing\VideoProcessor.cpp" />
+    <ClCompile Include="VideoProcessing\VideoExporter.cpp" />
     <ClCompile Include="RenderTargetManager.cpp" />
     <ClCompile Include="RenderGraph.cpp" />
     <ClCompile Include="RenderNodes\RenderNode.cpp" />

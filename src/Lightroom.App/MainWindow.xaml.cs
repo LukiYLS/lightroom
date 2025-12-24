@@ -89,62 +89,105 @@ namespace Lightroom.App
             
             if (renderHandle == IntPtr.Zero)
             {
-                System.Windows.MessageBox.Show("没有可导出的图片", "导出", MessageBoxButton.OK, MessageBoxImage.Warning);
+                System.Windows.MessageBox.Show("没有可导出的内容", "导出", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-
-            var dialog = new Microsoft.Win32.SaveFileDialog
+            
+            // 检查是否是视频
+            string? currentPath = ImageEditorViewControl.GetCurrentFilePath();
+            bool isVideo = ImageEditorViewControl.IsVideo();
+            
+            if (isVideo && !string.IsNullOrEmpty(currentPath))
             {
-                Filter = "JPEG文件|*.jpg|PNG文件|*.png|所有文件|*.*",
-                DefaultExt = "jpg"
-            };
-
-            if (dialog.ShowDialog() == true)
-            {
-                try
+                // 导出视频（MP4格式，H.265编码）
+                var dialog = new Microsoft.Win32.SaveFileDialog
                 {
-                    // 从文件扩展名确定格式
-                    string filePath = dialog.FileName;
-                    string extension = System.IO.Path.GetExtension(filePath).ToLower();
-                    string format = "jpeg"; // 默认格式
-                    uint quality = 90; // 默认质量
+                    Filter = "MP4文件|*.mp4|所有文件|*.*",
+                    DefaultExt = "mp4",
+                    FileName = System.IO.Path.GetFileNameWithoutExtension(currentPath ?? "export") + ".mp4"
+                };
 
-                    if (extension == ".png")
+                if (dialog.ShowDialog() == true)
+                {
+                    try
                     {
-                        format = "png";
+                        string filePath = dialog.FileName;
+                        System.Diagnostics.Debug.WriteLine($"[MainWindow] Exporting video to: {filePath}");
+                        
+                        // 设置RightPanel的渲染目标句柄（用于显示进度）
+                        RightPanelControl.SetRenderTargetHandle(renderHandle);
+                        
+                        // 开始导出视频（后台导出）
+                        bool success = RightPanelControl.StartVideoExport(filePath);
+                        
+                        if (!success)
+                        {
+                            System.Windows.MessageBox.Show("无法开始导出视频，可能正在导出中", "导出", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        }
+                        // 成功开始导出后，进度会在RightPanel中显示
                     }
-                    else if (extension == ".jpg" || extension == ".jpeg")
+                    catch (Exception ex)
                     {
-                        format = "jpeg";
-                        quality = 90; // JPEG 质量
-                    }
-                    else
-                    {
-                        // 如果没有扩展名或扩展名不支持，根据过滤器选择格式
-                        // 这里可以根据需要添加更多格式支持
-                        format = "jpeg";
-                    }
-
-                    System.Diagnostics.Debug.WriteLine($"[MainWindow] Exporting to: {filePath}, format: {format}, quality: {quality}");
-
-                    // 调用 SDK 导出函数
-                    bool success = NativeMethods.ExportImage(renderHandle, filePath, format, quality);
-                    
-                    System.Diagnostics.Debug.WriteLine($"[MainWindow] Export result: {success}");
-                    
-                    if (success)
-                    {
-                        System.Windows.MessageBox.Show($"图片已成功导出到:\n{filePath}", "导出成功", MessageBoxButton.OK, MessageBoxImage.Information);
-                    }
-                    else
-                    {
-                        System.Windows.MessageBox.Show("导出失败，请检查文件路径和权限", "导出失败", MessageBoxButton.OK, MessageBoxImage.Error);
+                        System.Windows.MessageBox.Show($"导出视频时出错: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
                     }
                 }
-                catch (Exception ex)
+            }
+            else
+            {
+                // 导出图片
+                var dialog = new Microsoft.Win32.SaveFileDialog
                 {
-                    System.Diagnostics.Debug.WriteLine($"[MainWindow] Export exception: {ex.Message}\n{ex.StackTrace}");
-                    System.Windows.MessageBox.Show($"导出时发生错误:\n{ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                    Filter = "JPEG文件|*.jpg|PNG文件|*.png|所有文件|*.*",
+                    DefaultExt = "jpg"
+                };
+
+                if (dialog.ShowDialog() == true)
+                {
+                    try
+                    {
+                        // 从文件扩展名确定格式
+                        string filePath = dialog.FileName;
+                        string extension = System.IO.Path.GetExtension(filePath).ToLower();
+                        string format = "jpeg"; // 默认格式
+                        uint quality = 90; // 默认质量
+
+                        if (extension == ".png")
+                        {
+                            format = "png";
+                        }
+                        else if (extension == ".jpg" || extension == ".jpeg")
+                        {
+                            format = "jpeg";
+                            quality = 90; // JPEG 质量
+                        }
+                        else
+                        {
+                            // 如果没有扩展名或扩展名不支持，根据过滤器选择格式
+                            // 这里可以根据需要添加更多格式支持
+                            format = "jpeg";
+                        }
+
+                        System.Diagnostics.Debug.WriteLine($"[MainWindow] Exporting to: {filePath}, format: {format}, quality: {quality}");
+
+                        // 调用 SDK 导出函数
+                        bool success = NativeMethods.ExportImage(renderHandle, filePath, format, quality);
+                        
+                        System.Diagnostics.Debug.WriteLine($"[MainWindow] Export result: {success}");
+                        
+                        if (success)
+                        {
+                            System.Windows.MessageBox.Show($"图片已成功导出到:\n{filePath}", "导出成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                        }
+                        else
+                        {
+                            System.Windows.MessageBox.Show("导出失败，请检查文件路径和权限", "导出失败", MessageBoxButton.OK, MessageBoxImage.Error);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[MainWindow] Export exception: {ex.Message}\n{ex.StackTrace}");
+                        System.Windows.MessageBox.Show($"导出时发生错误:\n{ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
                 }
             }
         }

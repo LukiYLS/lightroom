@@ -4,6 +4,10 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Threading;
+using System.Runtime.InteropServices;
+using Lightroom.App.Core;
 
 namespace Lightroom.App.Controls
 {
@@ -14,6 +18,10 @@ namespace Lightroom.App.Controls
         public event EventHandler<double>? FilterIntensityChanged;
 
         private Dictionary<string, string> _filterPaths = new Dictionary<string, string>();
+        
+        // 视频导出相关
+        private IntPtr _renderTargetHandle = IntPtr.Zero;
+        private NativeMethods.VideoExportProgressDelegate? _progressCallback;
 
         public RightPanel()
         {
@@ -224,6 +232,107 @@ namespace Lightroom.App.Controls
         private void ResetButton_Click(object sender, RoutedEventArgs e)
         {
             ResetAll();
+        }
+        
+        // 设置渲染目标句柄（用于视频导出）
+        public void SetRenderTargetHandle(IntPtr renderTargetHandle)
+        {
+            _renderTargetHandle = renderTargetHandle;
+        }
+        
+        // 开始导出视频
+        public bool StartVideoExport(string outputPath)
+        {
+            if (_renderTargetHandle == IntPtr.Zero)
+            {
+                return false;
+            }
+            
+            // 检查是否正在导出
+            if (NativeMethods.IsExportingVideo(_renderTargetHandle))
+            {
+                return false;
+            }
+            
+            // 创建进度回调
+            _progressCallback = (progress, currentFrame, totalFrames, userData) =>
+            {
+                // 在UI线程上更新进度
+                Dispatcher.Invoke(() =>
+                {
+                    UpdateExportProgress(progress, currentFrame, totalFrames);
+                });
+            };
+            
+            // 显示进度面板
+            ExportProgressPanel.Visibility = Visibility.Visible;
+            ExportProgressBar.Value = 0;
+            ExportProgressText.Text = "准备中...";
+            
+            // 开始导出
+            bool success = NativeMethods.ExportVideo(_renderTargetHandle, outputPath, _progressCallback, IntPtr.Zero);
+            
+            if (!success)
+            {
+                ExportProgressPanel.Visibility = Visibility.Collapsed;
+            }
+            
+            return success;
+        }
+        
+        // 更新导出进度
+        private void UpdateExportProgress(double progress, long currentFrame, long totalFrames)
+        {
+            ExportProgressBar.Value = progress * 100.0;
+            ExportProgressText.Text = $"导出中: {currentFrame} / {totalFrames} 帧 ({progress * 100.0:F1}%)";
+            
+            // 如果完成，隐藏进度面板
+            if (progress >= 1.0)
+            {
+                ExportProgressText.Text = "导出完成";
+                // 延迟隐藏，让用户看到完成消息
+                var timer = new DispatcherTimer
+                {
+                    Interval = TimeSpan.FromSeconds(2)
+                };
+                timer.Tick += (s, e) =>
+                {
+                    timer.Stop();
+                    ExportProgressPanel.Visibility = Visibility.Collapsed;
+                };
+                timer.Start();
+            }
+        }
+        
+        // 取消导出
+        private void CancelExportButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_renderTargetHandle != IntPtr.Zero)
+            {
+                NativeMethods.CancelVideoExport(_renderTargetHandle);
+                ExportProgressPanel.Visibility = Visibility.Collapsed;
+            }
+        }
+    }
+    
+    // 进度转换器（用于ProgressBar）
+    public class ProgressConverter : IMultiValueConverter
+    {
+        public object Convert(object[] values, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            if (values.Length == 3 && values[0] is double value && values[1] is double maximum && values[2] is double width)
+            {
+                if (maximum > 0)
+                {
+                    return (value / maximum) * width;
+                }
+            }
+            return 0.0;
+        }
+        
+        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, System.Globalization.CultureInfo culture)
+        {
+            throw new NotImplementedException();
         }
     }
 }
