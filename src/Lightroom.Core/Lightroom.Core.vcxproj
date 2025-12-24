@@ -175,6 +175,7 @@ if exist "$(ProjectDir)..\..\third_party\ffmpeg\bin\*.dll" copy /Y "$(ProjectDir
     <ClInclude Include="RenderNodes\ScaleNode.h" />
     <ClInclude Include="RenderNodes\ImageAdjustNode.h" />
     <ClInclude Include="RenderNodes\FilterNode.h" />
+    <ClInclude Include="RenderNodes\RGBToYUVNode.h" />
     <ClInclude Include="RenderNodes\YUVToRGBNode.h" />
   </ItemGroup>
   <ItemGroup>
@@ -197,6 +198,7 @@ if exist "$(ProjectDir)..\..\third_party\ffmpeg\bin\*.dll" copy /Y "$(ProjectDir
     <ClCompile Include="RenderNodes\ScaleNode.cpp" />
     <ClCompile Include="RenderNodes\ImageAdjustNode.cpp" />
     <ClCompile Include="RenderNodes\FilterNode.cpp" />
+    <ClCompile Include="RenderNodes\RGBToYUVNode.cpp" />
     <ClCompile Include="RenderNodes\YUVToRGBNode.cpp" />
     <ClCompile Include="d3d11rhi\D3D11CommandContext.cpp" />
     <ClCompile Include="d3d11rhi\D3D11IndexBuffer.cpp" />

@@ -23,6 +23,7 @@ namespace LightroomCore {
 
     class VideoProcessor;
     class RenderGraph;
+    class RGBToYUVNode;
 
     // 进度回调: progress (0.0-1.0), currentFrame, totalFrames
     using VideoExportProgressCallback = std::function<void(double, int64_t, int64_t)>;
@@ -60,7 +61,14 @@ namespace LightroomCore {
             AVFrame* rgbFrame = nullptr;   // RGB24
             SwsContext* swsCtx = nullptr;
         };
+		// Staging textures for YUV readback (reused across frames)
+		struct YUVStagingTextures {
+			ComPtr<ID3D11Texture2D> Y;
+			ComPtr<ID3D11Texture2D> U;
+			ComPtr<ID3D11Texture2D> V;
 
+			bool Init(ID3D11Device* device, uint32_t width, uint32_t height);
+		};
         void ExportThreadFunc(
             const std::wstring& videoPath,
             RenderGraph* sourceGraph,
@@ -73,10 +81,22 @@ namespace LightroomCore {
 
         // 编码管线
         bool InitEncoder(FFmpegContext& ctx, uint32_t w, uint32_t h, double fps, const std::string& path);
-        void EncodeFrame(FFmpegContext& ctx, const std::vector<uint8_t>& bgraData, uint32_t w, uint32_t h, uint32_t bgraStride, int64_t pts);
+        void EncodeFrame(FFmpegContext& ctx, 
+                         std::shared_ptr<RenderCore::RHITexture2D> yTexture,
+                         std::shared_ptr<RenderCore::RHITexture2D> uTexture,
+                         std::shared_ptr<RenderCore::RHITexture2D> vTexture,
+                         uint32_t w, uint32_t h, int64_t pts,
+                         YUVStagingTextures& staging);
         void FlushEncoder(FFmpegContext& ctx);
         void WritePackets(FFmpegContext& ctx);
         void CleanupContext(FFmpegContext& ctx);
+        
+        // Helper: Read YUV texture data to CPU (using pre-allocated staging textures)
+        bool ReadYUVTextureData(ID3D11Texture2D* yTex, ID3D11Texture2D* uTex, ID3D11Texture2D* vTex,
+                                uint32_t width, uint32_t height,
+                                uint8_t* yData, uint8_t* uData, uint8_t* vData,
+                                uint32_t yStride, uint32_t uStride, uint32_t vStride,
+                                YUVStagingTextures& staging);
 
         // 成员变量
         std::shared_ptr<RenderCore::DynamicRHI> m_ExportRHI; // 导出独占 RHI

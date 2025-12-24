@@ -3,6 +3,7 @@
 #include "../RenderGraph.h"
 #include "../RenderNodes/ImageAdjustNode.h"
 #include "../RenderNodes/FilterNode.h"
+#include "../RenderNodes/RGBToYUVNode.h"
 #include "../d3d11rhi/D3D11RHI.h"
 #include "../d3d11rhi/D3D11Texture2D.h"
 #include "../ImageProcessing/ImageExporter.h"
@@ -29,23 +30,23 @@ namespace LightroomCore {
 	VideoExporter::VideoExporter()
 		: m_IsExporting(false), m_ShouldCancel(false) {}
 
-	VideoExporter::~VideoExporter() {
-		CancelExport();
-	}
+VideoExporter::~VideoExporter() {
+    CancelExport();
+}
 
-	bool VideoExporter::ExportVideo(
-		const std::string& videoFilePath,
-		RenderGraph* renderGraph,
-		const std::string& outputPath,
+bool VideoExporter::ExportVideo(
+    const std::string& videoFilePath,
+    RenderGraph* renderGraph,
+    const std::string& outputPath,
 		VideoExportProgressCallback callback)
 	{
 		if (m_IsExporting.exchange(true)) {
 			m_LastError = "Export already in progress.";
-			return false;
-		}
-
+        return false;
+    }
+    
 		m_LastError.clear();
-		m_ShouldCancel = false;
+    m_ShouldCancel = false;
 
 		// Convert path to wide string
 		int len = MultiByteToWideChar(CP_UTF8, 0, videoFilePath.c_str(), -1, nullptr, 0);
@@ -54,17 +55,17 @@ namespace LightroomCore {
 
 		m_ExportThread = std::thread([this, wPath, renderGraph, outputPath, callback]() {
 			ExportThreadFunc(wPath, renderGraph, outputPath, callback);
-			});
+    });
+    
+    return true;
+}
 
-		return true;
-	}
-
-	void VideoExporter::CancelExport() {
-		m_ShouldCancel = true;
-		if (m_ExportThread.joinable()) {
-			m_ExportThread.join();
-		}
-	}
+void VideoExporter::CancelExport() {
+    m_ShouldCancel = true;
+    if (m_ExportThread.joinable()) {
+        m_ExportThread.join();
+    }
+}
 
 	bool VideoExporter::InitializeExportRHI() {
 		if (m_ExportRHI) {
@@ -115,11 +116,11 @@ namespace LightroomCore {
 		// 1. Setup isolated environment
 		if (!InitializeExportRHI()) {
 			m_LastError = "Failed to init export RHI";
-			m_IsExporting = false;
+            m_IsExporting = false;
 			if (callback) callback(0, 0, 0);
-			return;
-		}
-
+            return;
+        }
+        
 		auto* d3dRHI = dynamic_cast<RenderCore::D3D11DynamicRHI*>(m_ExportRHI.get());
 		ID3D11Device* device = d3dRHI->GetDevice();
 		ID3D11DeviceContext* context = d3dRHI->GetDeviceContext();
@@ -128,35 +129,62 @@ namespace LightroomCore {
 		auto processor = std::make_unique<VideoProcessor>(m_ExportRHI);
 		if (!processor->OpenVideo(videoPath)) {
 			m_LastError = "Failed to open video";
-			m_IsExporting = false;
-			return;
-		}
-
+            m_IsExporting = false;
+            return;
+        }
+        
 		const auto* meta = processor->GetMetadata();
 		// Warmup: Bind hardware decoder context
 		if (!processor->GetNextFrame() || !processor->SeekToFrame(0)) {
 			m_LastError = "Decoder warmup failed";
-			m_IsExporting = false;
-			return;
-		}
-
+            m_IsExporting = false;
+            return;
+        }
+        
 		auto exportGraph = CloneRenderGraph(sourceGraph, m_ExportRHI);
 
 		// 3. Setup Encoder & Resources
 		FFmpegContext ctx;
 		if (!InitEncoder(ctx, meta->width, meta->height, meta->frameRate, outPath)) {
 			m_LastError = "Encoder init failed";
-			m_IsExporting = false;
-			return;
-		}
-
+            m_IsExporting = false;
+            return;
+        }
+        
 		// Pre-allocate resources to prevent loop allocation overhead
-		std::vector<uint8_t> frameData;
-		uint32_t frameStride = 0;
-		uint32_t readWidth = 0, readHeight = 0;
 		ComPtr<ID3D11Query> syncQuery;
 		std::shared_ptr<RenderCore::RHITexture2D> processedTexture;
-		ImageExporter imageExporter(m_ExportRHI);
+		
+		// RGB to YUV conversion node (GPU-accelerated)
+		std::unique_ptr<RGBToYUVNode> rgbToYuvNode = std::make_unique<RGBToYUVNode>(m_ExportRHI);
+		
+		// Staging textures for YUV readback (created once, reused for all frames)
+		YUVStagingTextures stagingTextures;
+		if (!stagingTextures.Init(device, meta->width, meta->height)) {
+			m_LastError = "Failed to create staging textures";
+            m_IsExporting = false;
+            return;
+        }
+        
+		// YUV textures for GPU conversion
+		std::shared_ptr<RenderCore::RHITexture2D> yTexture = m_ExportRHI->RHICreateTexture2D(
+			RenderCore::EPixelFormat::PF_R8,
+			RenderCore::ETextureCreateFlags::TexCreate_RenderTargetable | RenderCore::ETextureCreateFlags::TexCreate_ShaderResource,
+			meta->width, meta->height, 1
+		);
+		
+		uint32_t uvWidth = meta->width / 2;
+		uint32_t uvHeight = meta->height / 2;
+		std::shared_ptr<RenderCore::RHITexture2D> uTexture = m_ExportRHI->RHICreateTexture2D(
+			RenderCore::EPixelFormat::PF_R8,
+			RenderCore::ETextureCreateFlags::TexCreate_RenderTargetable | RenderCore::ETextureCreateFlags::TexCreate_ShaderResource,
+			uvWidth, uvHeight, 1
+		);
+		std::shared_ptr<RenderCore::RHITexture2D> vTexture = m_ExportRHI->RHICreateTexture2D(
+			RenderCore::EPixelFormat::PF_R8,
+			RenderCore::ETextureCreateFlags::TexCreate_RenderTargetable | RenderCore::ETextureCreateFlags::TexCreate_ShaderResource,
+			uvWidth, uvHeight, 1
+		);
 
 		// Sync query for Intel stability
 		D3D11_QUERY_DESC qDesc = { D3D11_QUERY_EVENT, 0 };
@@ -191,10 +219,12 @@ namespace LightroomCore {
 						}
 					}
 
-					auto d3dWrapper = std::dynamic_pointer_cast<RenderCore::D3D11Texture2D>(targetTex);
-					ID3D11Texture2D* nativeTex = d3dWrapper->GetNativeTex();
+					// Convert RGB to YUV on GPU
+					if (!rgbToYuvNode->Execute(targetTex, yTexture, uTexture, vTexture, meta->width, meta->height)) {
+						throw std::runtime_error("Failed to convert RGB to YUV");
+					}
 
-					// 确保渲染完成
+					// 确保所有渲染完成
 					context->End(syncQuery.Get());
 					context->Flush();
 
@@ -202,16 +232,12 @@ namespace LightroomCore {
 					while (context->GetData(syncQuery.Get(), nullptr, 0, 0) == S_FALSE) {
 						if (m_ShouldCancel.load()) break;
 						std::this_thread::yield();
-					}
-
-					// 使用 ImageExporter 读取纹理数据（正确处理 stride）
-					if (!imageExporter.ReadD3D11TextureData(nativeTex, readWidth, readHeight, frameData, frameStride)) {
-						throw std::runtime_error("Failed to read texture data");
-					}
+					}					
 				}
 				// frameTex destructor runs here -> FFmpeg ref count -1
 
-				EncodeFrame(ctx, frameData, readWidth, readHeight, frameStride, currentFrame);
+				// Encode YUV textures directly (GPU data)
+				EncodeFrame(ctx, yTexture, uTexture, vTexture, meta->width, meta->height, currentFrame, stagingTextures);
 
 				// Memory Trim (Prevents OutOfMemory on long exports)
 				if (currentFrame % 50 == 0) {
@@ -224,9 +250,9 @@ namespace LightroomCore {
 				}
 
 				if (callback) callback((double)currentFrame / meta->totalFrames, currentFrame, meta->totalFrames);
-				currentFrame++;
-			}
-
+            currentFrame++;
+        }
+        
 			FlushEncoder(ctx);
 			if (callback) callback(1.0, meta->totalFrames, meta->totalFrames);
 
@@ -243,8 +269,8 @@ namespace LightroomCore {
 			m_ExportRHI->Shutdown();
 			m_ExportRHI.reset();
 		}
-		m_IsExporting = false;
-	}
+    m_IsExporting = false;
+}
 
 	// -------------------------------------------------------------------------
 	// FFmpeg Helpers
@@ -253,7 +279,7 @@ namespace LightroomCore {
 		avformat_alloc_output_context2(&ctx.formatCtx, nullptr, nullptr, path.c_str());
 		if (!ctx.formatCtx) return false;
 
-		const AVCodec* codec = avcodec_find_encoder_by_name("libx265");
+    const AVCodec* codec = avcodec_find_encoder_by_name("libx265");
 		if (!codec) codec = avcodec_find_encoder(AV_CODEC_ID_HEVC);
 		if (!codec) return false;
 
@@ -265,6 +291,8 @@ namespace LightroomCore {
 		ctx.codecCtx->framerate = av_inv_q(ctx.codecCtx->time_base);
 		ctx.codecCtx->bit_rate = 10000000; // 10Mbps
 		ctx.codecCtx->gop_size = 30;
+		// Set color range to Limited Range (TV range) for YUV420P
+		ctx.codecCtx->color_range = AVCOL_RANGE_MPEG; // Limited Range: Y[16,235], U/V[16,240]
 
 		av_opt_set(ctx.codecCtx->priv_data, "preset", "medium", 0);
 		av_opt_set(ctx.codecCtx->priv_data, "crf", "23", 0);
@@ -282,38 +310,53 @@ namespace LightroomCore {
 		return avformat_write_header(ctx.formatCtx, nullptr) >= 0;
 	}
 
-	void VideoExporter::EncodeFrame(FFmpegContext& ctx, const std::vector<uint8_t>& bgraData, uint32_t w, uint32_t h, uint32_t bgraStride, int64_t pts) {
-		if (!ctx.rgbFrame) {
-			ctx.rgbFrame = av_frame_alloc();
-			ctx.rgbFrame->format = AV_PIX_FMT_RGB24;
-			ctx.rgbFrame->width = w; ctx.rgbFrame->height = h;
-			av_frame_get_buffer(ctx.rgbFrame, 0);
-
+	void VideoExporter::EncodeFrame(FFmpegContext& ctx, 
+	                                 std::shared_ptr<RenderCore::RHITexture2D> yTexture,
+	                                 std::shared_ptr<RenderCore::RHITexture2D> uTexture,
+	                                 std::shared_ptr<RenderCore::RHITexture2D> vTexture,
+	                                 uint32_t w, uint32_t h, int64_t pts,
+	                                 YUVStagingTextures& staging) {
+		// Initialize frame if needed
+		if (!ctx.frame) {
 			ctx.frame = av_frame_alloc();
 			ctx.frame->format = AV_PIX_FMT_YUV420P;
 			ctx.frame->width = w; ctx.frame->height = h;
 			av_frame_get_buffer(ctx.frame, 0);
-
-			ctx.swsCtx = sws_getContext(w, h, AV_PIX_FMT_RGB24, w, h, AV_PIX_FMT_YUV420P, SWS_BILINEAR, nullptr, nullptr, nullptr);
+		}
+		// Get native D3D11 textures
+		auto yD3D = std::dynamic_pointer_cast<RenderCore::D3D11Texture2D>(yTexture);
+		auto uD3D = std::dynamic_pointer_cast<RenderCore::D3D11Texture2D>(uTexture);
+		auto vD3D = std::dynamic_pointer_cast<RenderCore::D3D11Texture2D>(vTexture);
+		
+		if (!yD3D || !uD3D || !vD3D) {
+			return;
 		}
 
-		// BGRA -> RGB (CPU conversion, 正确处理 stride)
-		uint8_t* dst = ctx.rgbFrame->data[0];
-		const uint8_t* src = bgraData.data();
-		uint32_t rgbStride = ctx.rgbFrame->linesize[0];
+		ID3D11Texture2D* yTex = yD3D->GetNativeTex();
+		ID3D11Texture2D* uTex = uD3D->GetNativeTex();
+		ID3D11Texture2D* vTex = vD3D->GetNativeTex();
+
+		// Read YUV data from GPU textures using pre-allocated staging textures
+		if (!ReadYUVTextureData(yTex, uTex, vTex, w, h,
+		                        ctx.frame->data[0], ctx.frame->data[1], ctx.frame->data[2],
+		                        ctx.frame->linesize[0], ctx.frame->linesize[1], ctx.frame->linesize[2],
+		                        staging)) {
+			return;
+		}
 		
-		for (uint32_t y = 0; y < h; ++y) {
-			const uint8_t* srcRow = src + (y * bgraStride);
-			uint8_t* dstRow = dst + (y * rgbStride);
-			for (uint32_t x = 0; x < w; ++x) {
-				dstRow[x * 3 + 0] = srcRow[x * 4 + 2]; // R
-				dstRow[x * 3 + 1] = srcRow[x * 4 + 1]; // G
-				dstRow[x * 3 + 2] = srcRow[x * 4 + 0]; // B
+		// Convert U/V from Full Range [0, 255] to Limited Range [16, 240]
+		// RGBToYUV outputs U/V in [0, 1] (Full Range), but encoder expects [16, 240] (Limited Range)
+		uint32_t uvWidth = w / 2;
+		uint32_t uvHeight = h / 2;
+		for (uint32_t y = 0; y < uvHeight; ++y) {
+			uint8_t* uLine = ctx.frame->data[1] + y * ctx.frame->linesize[1];
+			uint8_t* vLine = ctx.frame->data[2] + y * ctx.frame->linesize[2];
+			for (uint32_t x = 0; x < uvWidth; ++x) {
+				// Map [0, 255] -> [16, 240]
+				uLine[x] = (uint8_t)std::clamp((int)(uLine[x] * 224.0f / 255.0f + 16.0f), 16, 240);
+				vLine[x] = (uint8_t)std::clamp((int)(vLine[x] * 224.0f / 255.0f + 16.0f), 16, 240);
 			}
 		}
-
-		// RGB -> YUV
-		sws_scale(ctx.swsCtx, ctx.rgbFrame->data, ctx.rgbFrame->linesize, 0, h, ctx.frame->data, ctx.frame->linesize);
 
 		ctx.frame->pts = pts;
 		if (avcodec_send_frame(ctx.codecCtx, ctx.frame) >= 0) {
@@ -337,7 +380,7 @@ namespace LightroomCore {
 			av_interleaved_write_frame(ctx.formatCtx, pkt);
 			av_packet_unref(pkt);
 		}
-		av_packet_free(&pkt);
+            av_packet_free(&pkt);
 	}
 
 	void VideoExporter::CleanupContext(FFmpegContext& ctx) {
@@ -351,5 +394,99 @@ namespace LightroomCore {
 			ctx.formatCtx = nullptr;
 		}
 	}
+
+	bool VideoExporter::YUVStagingTextures::Init(ID3D11Device* device, uint32_t width, uint32_t height) {
+		D3D11_TEXTURE2D_DESC desc = {};
+		desc.Width = width;
+		desc.Height = height;
+		desc.MipLevels = 1;
+		desc.ArraySize = 1;
+		desc.Format = DXGI_FORMAT_R8_UNORM;
+		desc.SampleDesc.Count = 1;
+		desc.SampleDesc.Quality = 0;
+		desc.Usage = D3D11_USAGE_STAGING;
+		desc.BindFlags = 0;
+		desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+		desc.MiscFlags = 0;
+
+		if (FAILED(device->CreateTexture2D(&desc, nullptr, &Y))) {
+        return false;
+    }
+    
+		desc.Width = width / 2;
+		desc.Height = height / 2;
+		if (FAILED(device->CreateTexture2D(&desc, nullptr, &U))) {
+        return false;
+    }
+		if (FAILED(device->CreateTexture2D(&desc, nullptr, &V))) {
+        return false;
+    }
+    
+    return true;
+}
+
+	bool VideoExporter::ReadYUVTextureData(ID3D11Texture2D* yTex, ID3D11Texture2D* uTex, ID3D11Texture2D* vTex,
+	                                        uint32_t width, uint32_t height,
+	                                        uint8_t* yData, uint8_t* uData, uint8_t* vData,
+	                                        uint32_t yStride, uint32_t uStride, uint32_t vStride,
+	                                        YUVStagingTextures& staging) {
+		if (!yTex || !uTex || !vTex || !yData || !uData || !vData) {
+			return false;
+		}
+
+		RenderCore::D3D11DynamicRHI* d3d11RHI = dynamic_cast<RenderCore::D3D11DynamicRHI*>(m_ExportRHI.get());
+		if (!d3d11RHI) {
+			return false;
+		}
+
+		ID3D11DeviceContext* context = d3d11RHI->GetDeviceContext();
+		if (!context) {
+			return false;
+		}
+
+		// Helper lambda to read a texture plane using pre-allocated staging texture
+		auto ReadPlane = [&](ID3D11Texture2D* texture, ID3D11Texture2D* stagingTex,
+		                     uint32_t texWidth, uint32_t texHeight, 
+		                     uint8_t* dstData, uint32_t dstStride) -> bool {
+			// Copy to staging
+			context->CopyResource(stagingTex, texture);
+
+			// Map and read
+			D3D11_MAPPED_SUBRESOURCE mapped;
+			if (FAILED(context->Map(stagingTex, 0, D3D11_MAP_READ, 0, &mapped))) {
+				return false;
+			}
+
+			// Copy data with stride handling
+			uint32_t copyWidth = std::min(texWidth, dstStride);
+			for (uint32_t y = 0; y < texHeight; ++y) {
+				memcpy(dstData + (y * dstStride), 
+				       (uint8_t*)mapped.pData + (y * mapped.RowPitch), 
+				       copyWidth);
+			}
+
+			context->Unmap(stagingTex, 0);
+			return true;
+		};
+
+		// Read Y plane (full resolution)
+		if (!ReadPlane(yTex, staging.Y.Get(), width, height, yData, yStride)) {
+        return false;
+    }
+    
+		// Read U plane (half resolution)
+		uint32_t uvWidth = width / 2;
+		uint32_t uvHeight = height / 2;
+		if (!ReadPlane(uTex, staging.U.Get(), uvWidth, uvHeight, uData, uStride)) {
+            return false;
+        }
+        
+		// Read V plane (half resolution)
+		if (!ReadPlane(vTex, staging.V.Get(), uvWidth, uvHeight, vData, vStride)) {
+            return false;
+    }
+    
+    return true;
+}
 
 } // namespace LightroomCore
