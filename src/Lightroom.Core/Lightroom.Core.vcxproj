@@ -76,7 +76,7 @@
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <EnableUAC>false</EnableUAC>
       <ModuleDefinitionFile>$(ProjectDir)LightroomCore.def</ModuleDefinitionFile>
-      <AdditionalLibraryDirectories>$(ProjectDir)..\..\third_party\prebuilt\libraw;$(ProjectDir)..\..\third_party\prebuilt\ffmpeg\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)third_party\prebuilt\libraw;$(SolutionDir)third_party\prebuilt\ffmpeg\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>d3d11.lib;dxgi.lib;d3dcompiler.lib;dxguid.lib;d3d9.lib;libraw.lib;avformat.lib;avcodec.lib;avutil.lib;swscale.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
@@ -103,7 +103,7 @@ if exist "$(ProjectDir)..\..\third_party\prebuilt\ffmpeg\bin\*.dll" copy /Y "$(P
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalLibraryDirectories>$(ProjectDir)..\..\third_party\prebuilt\libraw;$(ProjectDir)..\..\third_party\prebuilt\ffmpeg\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)third_party\prebuilt\libraw;$(SolutionDir)third_party\prebuilt\ffmpeg\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>d3d11.lib;dxgi.lib;d3dcompiler.lib;dxguid.lib;d3d9.lib;libraw.lib;avformat.lib;avcodec.lib;avutil.lib;swscale.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
