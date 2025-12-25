@@ -113,6 +113,15 @@
     <ClCompile Include="RenderNodes\YUVToRGBNode.cpp">
       <Filter>RenderNodes</Filter>
     </ClCompile>
+    <ClCompile Include="VideoProcessing\FFmpegHardwareVideoLoader.cpp">
+      <Filter>VideoProcessing</Filter>
+    </ClCompile>
+    <ClCompile Include="VideoProcessing\FFmpegSoftwareVideoLoader.cpp">
+      <Filter>VideoProcessing</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderNodes\RGBToYUVNode.cpp">
+      <Filter>RenderNodes</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="LightroomSDK.h" />
@@ -295,6 +304,9 @@
       <Filter>RenderNodes</Filter>
     </ClInclude>
     <ClInclude Include="RenderNodes\YUVToRGBNode.h">
+      <Filter>RenderNodes</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderNodes\RGBToYUVNode.h">
       <Filter>RenderNodes</Filter>
     </ClInclude>
   </ItemGroup>

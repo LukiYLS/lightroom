@@ -1,105 +1,105 @@
 ﻿#include "RenderGraph.h"
 #include "VideoProcessing/VideoPerformanceProfiler.h"
+#include "../d3d11rhi/D3D11RHI.h"
+#include "../d3d11rhi/D3D11Texture2D.h"
 #include <iostream>
 
 namespace LightroomCore {
 
-RenderGraph::RenderGraph(std::shared_ptr<RenderCore::DynamicRHI> rhi)
-    : m_RHI(rhi)
-{
-}
+	RenderGraph::RenderGraph(std::shared_ptr<RenderCore::DynamicRHI> rhi)
+		: m_RHI(rhi)
+	{
+	}
 
-RenderGraph::~RenderGraph() {
-    Clear();
-}
+	RenderGraph::~RenderGraph() {
+		Clear();
+	}
 
-void RenderGraph::AddNode(std::shared_ptr<RenderNode> node) {
-    if (node) {
-        m_Nodes.push_back(node);
-    }
-}
+	void RenderGraph::AddNode(std::shared_ptr<RenderNode> node) {
+		if (node) {
+			m_Nodes.push_back(node);
+		}
+	}
 
-void RenderGraph::Clear() {
-    m_Nodes.clear();
-    m_IntermediateTextures.clear();
-}
+	void RenderGraph::Clear() {
+		m_Nodes.clear();
+		m_TexturePool.clear();
+	}
 
-bool RenderGraph::Execute(std::shared_ptr<RenderCore::RHITexture2D> inputTexture,
-                          std::shared_ptr<RenderCore::RHITexture2D> outputTarget,
-                          uint32_t width, uint32_t height) {
-    if (!m_RHI || !inputTexture || !outputTarget || m_Nodes.empty()) {
-        return false;
-    }
+	bool RenderGraph::Execute(std::shared_ptr<RenderCore::RHITexture2D> inputTexture,
+		std::shared_ptr<RenderCore::RHITexture2D> outputTarget,
+		uint32_t width, uint32_t height) {
+		if (!m_RHI || !inputTexture || !outputTarget || m_Nodes.empty()) {
+			return false;
+		}
 
-    // 如果只有一个节点，直接执行
-    if (m_Nodes.size() == 1) {
-        return m_Nodes[0]->Execute(inputTexture, outputTarget, width, height);
-    }
+		if (m_Nodes.size() == 1) {
+			return m_Nodes[0]->Execute(inputTexture, outputTarget, width, height);
+		}
 
-    // 多个节点：需要中间纹理
-    std::shared_ptr<RenderCore::RHITexture2D> currentInput = inputTexture;
-    std::shared_ptr<RenderCore::RHITexture2D> currentOutput = nullptr;
+		std::shared_ptr<RenderCore::RHITexture2D> currentInput = inputTexture;
+		std::shared_ptr<RenderCore::RHITexture2D> currentOutput = nullptr;
 
-    for (size_t i = 0; i < m_Nodes.size(); ++i) {
-        bool isLastNode = (i == m_Nodes.size() - 1);
+		size_t poolIndex = 0;
+		for (size_t i = 0; i < m_Nodes.size(); ++i) {
+			bool isLastNode = (i == m_Nodes.size() - 1);
 
-        if (isLastNode) {
-            // 最后一个节点：输出到最终目标
-            currentOutput = outputTarget;
-        } else {
-            // 中间节点：创建中间纹理
-            currentOutput = CreateIntermediateTexture(width, height);
-            if (!currentOutput) {
-                std::cerr << "[RenderGraph] Failed to create intermediate texture for node " << i << std::endl;
-                return false;
-            }
-        }
+			if (isLastNode) {
+				currentOutput = outputTarget;
+			}
+			else {
+				currentOutput = GetCachedTexture(width, height, poolIndex);
+				poolIndex++;
+				if (!currentOutput) {
+					return false;
+				}
+			}
 
-        // 执行节点
-        {
-            using namespace LightroomCore;
-            std::string nodeName = std::string("RenderGraph_Node_") + m_Nodes[i]->GetName();
-            ScopedTimer nodeTimer(nodeName);
-            if (!m_Nodes[i]->Execute(currentInput, currentOutput, width, height)) {
-                std::cerr << "[RenderGraph] Node " << i << " (" << m_Nodes[i]->GetName() << ") failed" << std::endl;
-                return false;
-            }
-        }
+			{
+				if (!m_Nodes[i]->Execute(currentInput, currentOutput, width, height)) {
+					return false;
+				}
+			}
+			currentInput = currentOutput;
+		}
 
-        // 下一节点的输入是当前节点的输出
-        currentInput = currentOutput;
-    }
+		return true;
+	}
 
-    return true;
-}
+	std::shared_ptr<RenderCore::RHITexture2D> RenderGraph::GetCachedTexture(uint32_t width, uint32_t height, size_t index) {
+		if (index < m_TexturePool.size()) {
+			auto existingTex = m_TexturePool[index];
+			if (existingTex) {
+				// 2. 检查尺寸是否匹配
+				auto* d3dTex = dynamic_cast<RenderCore::D3D11Texture2D*>(existingTex.get());
+				if (d3dTex) {
+					D3D11_TEXTURE2D_DESC desc;
+					d3dTex->GetNativeTex()->GetDesc(&desc);
+					if (desc.Width == width && desc.Height == height) {
+						return existingTex;
+					}
+				}
+			}
+		}
 
-std::shared_ptr<RenderCore::RHITexture2D> RenderGraph::CreateIntermediateTexture(uint32_t width, uint32_t height) {
-    // 创建中间纹理（用于节点之间的传递）
-    auto texture = m_RHI->RHICreateTexture2D(
-        RenderCore::EPixelFormat::PF_B8G8R8A8,
-        RenderCore::ETextureCreateFlags::TexCreate_RenderTargetable | RenderCore::ETextureCreateFlags::TexCreate_ShaderResource,
-        width,
-        height,
-        1  // NumMips
-    );
+		auto newTexture = m_RHI->RHICreateTexture2D(
+			RenderCore::EPixelFormat::PF_B8G8R8A8,
+			RenderCore::ETextureCreateFlags::TexCreate_RenderTargetable | RenderCore::ETextureCreateFlags::TexCreate_ShaderResource,
+			width,
+			height,
+			1
+		);
 
-    if (texture) {
-        m_IntermediateTextures.push_back(texture);
-    }
+		if (!newTexture)
+			return nullptr;
 
-    return texture;
-}
+		if (index < m_TexturePool.size()) {
+			m_TexturePool[index] = newTexture;
+		}
+		else {
+			m_TexturePool.push_back(newTexture);
+		}
+		return newTexture;
+	}
 
 } // namespace LightroomCore
-
-
-
-
-
-
-
-
-
-
-
-

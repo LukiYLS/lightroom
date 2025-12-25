@@ -39,14 +39,10 @@ public:
     }
 
 private:
-    std::shared_ptr<RenderCore::DynamicRHI> m_RHI;
-    std::vector<std::shared_ptr<RenderNode>> m_Nodes;
-    
-    // 中间纹理缓存（用于节点之间的传递）
-    std::vector<std::shared_ptr<RenderCore::RHITexture2D>> m_IntermediateTextures;
-    
-    // 创建中间纹理
-    std::shared_ptr<RenderCore::RHITexture2D> CreateIntermediateTexture(uint32_t width, uint32_t height);
+	std::shared_ptr<RenderCore::RHITexture2D> GetCachedTexture(uint32_t width, uint32_t height, size_t index);
+	std::shared_ptr<RenderCore::DynamicRHI> m_RHI;
+	std::vector<std::shared_ptr<RenderNode>> m_Nodes;
+	std::vector<std::shared_ptr<RenderCore::RHITexture2D>> m_TexturePool;
 };
 
 } // namespace LightroomCore

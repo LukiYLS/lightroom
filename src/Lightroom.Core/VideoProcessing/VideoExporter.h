@@ -17,6 +17,7 @@ extern "C" {
     struct AVStream;
     struct AVFrame;
     struct SwsContext;
+	struct AVPacket;
 }
 
 namespace LightroomCore {
@@ -60,6 +61,7 @@ namespace LightroomCore {
             AVFrame* frame = nullptr;      // YUV420P
             AVFrame* rgbFrame = nullptr;   // RGB24
             SwsContext* swsCtx = nullptr;
+            AVPacket* packet = nullptr;
         };
 		// Staging textures for YUV readback (reused across frames)
 		struct YUVStagingTextures {

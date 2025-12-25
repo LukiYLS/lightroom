@@ -275,40 +275,60 @@ void VideoExporter::CancelExport() {
 	// -------------------------------------------------------------------------
 	// FFmpeg Helpers
 	// -------------------------------------------------------------------------
-	bool VideoExporter::InitEncoder(FFmpegContext& ctx, uint32_t w, uint32_t h, double fps, const std::string& path) {
-		avformat_alloc_output_context2(&ctx.formatCtx, nullptr, nullptr, path.c_str());
-		if (!ctx.formatCtx) return false;
+bool VideoExporter::InitEncoder(FFmpegContext& ctx, uint32_t w, uint32_t h, double fps, const std::string& path) {
+	avformat_alloc_output_context2(&ctx.formatCtx, nullptr, nullptr, path.c_str());
+	if (!ctx.formatCtx) return false;
 
-    const AVCodec* codec = avcodec_find_encoder_by_name("libx265");
-		if (!codec) codec = avcodec_find_encoder(AV_CODEC_ID_HEVC);
-		if (!codec) return false;
+	// 尝试寻找硬件编码器 (可选，如果不想折腾 NV12 格式，先继续用 libx265)
+	const AVCodec* codec = avcodec_find_encoder_by_name("libx265");
+	if (!codec) codec = avcodec_find_encoder(AV_CODEC_ID_HEVC);
+	if (!codec) return false;
 
-		ctx.codecCtx = avcodec_alloc_context3(codec);
-		ctx.codecCtx->width = w;
-		ctx.codecCtx->height = h;
-		ctx.codecCtx->pix_fmt = AV_PIX_FMT_YUV420P;
-		ctx.codecCtx->time_base = av_make_q(1000, static_cast<int>(fps * 1000 + 0.5));
-		ctx.codecCtx->framerate = av_inv_q(ctx.codecCtx->time_base);
-		ctx.codecCtx->bit_rate = 10000000; // 10Mbps
-		ctx.codecCtx->gop_size = 30;
-		// Set color range to Limited Range (TV range) for YUV420P
-		ctx.codecCtx->color_range = AVCOL_RANGE_MPEG; // Limited Range: Y[16,235], U/V[16,240]
+	ctx.codecCtx = avcodec_alloc_context3(codec);
+	ctx.codecCtx->width = w;
+	ctx.codecCtx->height = h;
+	ctx.codecCtx->pix_fmt = AV_PIX_FMT_YUV420P;
 
-		av_opt_set(ctx.codecCtx->priv_data, "preset", "medium", 0);
-		av_opt_set(ctx.codecCtx->priv_data, "crf", "23", 0);
+	// [重要] 时间基准设置
+	ctx.codecCtx->time_base = av_make_q(1, static_cast<int>(fps));
+	ctx.codecCtx->framerate = av_make_q(static_cast<int>(fps), 1);
 
-		if (avcodec_open2(ctx.codecCtx, codec, nullptr) < 0) return false;
+	// 4K 60fps 码率通常需要 20M - 40M
+	ctx.codecCtx->bit_rate = 30000000; // 30 Mbps
 
-		ctx.stream = avformat_new_stream(ctx.formatCtx, codec);
-		ctx.stream->time_base = ctx.codecCtx->time_base;
-		avcodec_parameters_from_context(ctx.stream->codecpar, ctx.codecCtx);
+	// 1. 开启多线程
+	ctx.codecCtx->thread_count = 0;
+	if (codec->capabilities & AV_CODEC_CAP_FRAME_THREADS)
+		ctx.codecCtx->thread_type = FF_THREAD_FRAME;
 
-		if (!(ctx.formatCtx->oformat->flags & AVFMT_NOFILE)) {
-			if (avio_open(&ctx.formatCtx->pb, path.c_str(), AVIO_FLAG_WRITE) < 0) return false;
-		}
+	// 2. 速度优先预设
+	av_opt_set(ctx.codecCtx->priv_data, "preset", "ultrafast", 0);
 
-		return avformat_write_header(ctx.formatCtx, nullptr) >= 0;
+	// 3. 降低延迟
+	av_opt_set(ctx.codecCtx->priv_data, "tune", "zerolatency", 0);
+
+	// 4. 适当放宽画质以换取速度 (23 -> 28)
+	av_opt_set(ctx.codecCtx->priv_data, "crf", "28", 0);
+
+	// 5. 限制 x265 内部参数以提升速度
+	// - no-deblock: 关闭去块滤波（画质略降，速度升）
+	// - no-sao: 关闭采样自适应偏移（显著提升 4K 编码速度）
+	av_opt_set(ctx.codecCtx->priv_data, "x265-params", "no-deblock=1:no-sao=1", 0);
+
+	if (avcodec_open2(ctx.codecCtx, codec, nullptr) < 0) return false;
+
+	ctx.stream = avformat_new_stream(ctx.formatCtx, codec);
+	ctx.stream->time_base = ctx.codecCtx->time_base;
+	avcodec_parameters_from_context(ctx.stream->codecpar, ctx.codecCtx);
+
+	if (!(ctx.formatCtx->oformat->flags & AVFMT_NOFILE)) {
+		if (avio_open(&ctx.formatCtx->pb, path.c_str(), AVIO_FLAG_WRITE) < 0) return false;
 	}
+	ctx.packet = av_packet_alloc();
+	if (!ctx.packet) return false;
+
+	return avformat_write_header(ctx.formatCtx, nullptr) >= 0;
+}
 
 	void VideoExporter::EncodeFrame(FFmpegContext& ctx, 
 	                                 std::shared_ptr<RenderCore::RHITexture2D> yTexture,
@@ -373,14 +393,12 @@ void VideoExporter::CancelExport() {
 	}
 
 	void VideoExporter::WritePackets(FFmpegContext& ctx) {
-		AVPacket* pkt = av_packet_alloc();
-		while (avcodec_receive_packet(ctx.codecCtx, pkt) == 0) {
-			av_packet_rescale_ts(pkt, ctx.codecCtx->time_base, ctx.stream->time_base);
-			pkt->stream_index = ctx.stream->index;
-			av_interleaved_write_frame(ctx.formatCtx, pkt);
-			av_packet_unref(pkt);
+		while (avcodec_receive_packet(ctx.codecCtx, ctx.packet) == 0) {
+			av_packet_rescale_ts(ctx.packet, ctx.codecCtx->time_base, ctx.stream->time_base);
+			ctx.packet->stream_index = ctx.stream->index;
+			av_interleaved_write_frame(ctx.formatCtx, ctx.packet);
+			av_packet_unref(ctx.packet);
 		}
-            av_packet_free(&pkt);
 	}
 
 	void VideoExporter::CleanupContext(FFmpegContext& ctx) {
@@ -393,6 +411,7 @@ void VideoExporter::CancelExport() {
 			avformat_free_context(ctx.formatCtx);
 			ctx.formatCtx = nullptr;
 		}
+		if (ctx.packet) av_packet_free(&ctx.packet);
 	}
 
 	bool VideoExporter::YUVStagingTextures::Init(ID3D11Device* device, uint32_t width, uint32_t height) {
