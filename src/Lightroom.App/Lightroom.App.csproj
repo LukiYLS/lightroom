@@ -19,8 +19,8 @@
     <PropertyGroup>
       <NativeDllPath>..\..\bin\$(Configuration)\LightroomCore.dll</NativeDllPath>
       <NativePdbPath>..\..\bin\$(Configuration)\LightroomCore.pdb</NativePdbPath>
-      <LibRawDllPath>..\..\third_party\libraw\buildfiles\release-x86_64\libraw.dll</LibRawDllPath>
-      <FFmpegBinPath>..\..\third_party\ffmpeg\bin</FFmpegBinPath>
+      <LibRawDllPath>..\..\third_party\prebuilt\libraw\libraw.dll</LibRawDllPath>
+      <FFmpegBinPath>..\..\third_party\prebuilt\ffmpeg\bin</FFmpegBinPath>
       <LutsSourcePath>..\..\resources\luts</LutsSourcePath>
       <LutsTargetPath>$(OutDir)resources\luts</LutsTargetPath>
     </PropertyGroup>

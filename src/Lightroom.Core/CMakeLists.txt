@@ -45,14 +45,14 @@ set(RELEASE_DEFINITIONS
 # 包含目录
 set(INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/d3d11rhi
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/libraw
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/ffmpeg/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/prebuilt/libraw/libraw
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/prebuilt/ffmpeg/include
 )
 
 # 库目录
 set(LIBRARY_DIRS
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/libraw/lib
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/ffmpeg/lib
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/prebuilt/libraw
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/prebuilt/ffmpeg/lib
 )
 
 # 源文件列表（与 vcxproj 完全一致）
@@ -321,13 +321,13 @@ if(WIN32)
     # 复制 libraw.dll
     add_custom_command(TARGET LightroomCore POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_SOURCE_DIR}/../../third_party/libraw/buildfiles/release-x86_64/libraw.dll"
+        "${CMAKE_SOURCE_DIR}/../../third_party/prebuilt/libraw/libraw.dll"
         "$<TARGET_FILE_DIR:LightroomCore>/libraw.dll"
         COMMENT "Copying libraw.dll"
     )
     
     # 复制 FFmpeg DLLs
-    file(GLOB FFMPEG_DLLS "${CMAKE_SOURCE_DIR}/../../third_party/ffmpeg/bin/*.dll")
+    file(GLOB FFMPEG_DLLS "${CMAKE_SOURCE_DIR}/../../third_party/prebuilt/ffmpeg/bin/*.dll")
     if(FFMPEG_DLLS)
         add_custom_command(TARGET LightroomCore POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different

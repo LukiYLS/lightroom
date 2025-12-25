@@ -63,7 +63,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(ProjectDir)d3d11rhi;$(ProjectDir)..\..\third_party\libraw;$(ProjectDir)..\..\third_party\ffmpeg\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)d3d11rhi;$(ProjectDir)..\..\third_party\prebuilt\libraw\libraw;$(ProjectDir)..\..\third_party\prebuilt\ffmpeg\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <Optimization>Disabled</Optimization>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
@@ -76,12 +76,12 @@
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <EnableUAC>false</EnableUAC>
       <ModuleDefinitionFile>$(ProjectDir)LightroomCore.def</ModuleDefinitionFile>
-      <AdditionalLibraryDirectories>$(ProjectDir)..\..\third_party\libraw\lib;$(ProjectDir)..\..\third_party\ffmpeg\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\..\third_party\prebuilt\libraw;$(ProjectDir)..\..\third_party\prebuilt\ffmpeg\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>d3d11.lib;dxgi.lib;d3dcompiler.lib;dxguid.lib;d3d9.lib;libraw.lib;avformat.lib;avcodec.lib;avutil.lib;swscale.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>copy /Y "$(ProjectDir)..\..\third_party\libraw\buildfiles\release-x86_64\libraw.dll" "$(OutDir)libraw.dll"
-if exist "$(ProjectDir)..\..\third_party\ffmpeg\bin\*.dll" copy /Y "$(ProjectDir)..\..\third_party\ffmpeg\bin\*.dll" "$(OutDir)"</Command>
+      <Command>copy /Y "$(ProjectDir)..\..\third_party\prebuilt\libraw\libraw.dll" "$(OutDir)libraw.dll"
+if exist "$(ProjectDir)..\..\third_party\prebuilt\ffmpeg\bin\*.dll" copy /Y "$(ProjectDir)..\..\third_party\prebuilt\ffmpeg\bin\*.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -94,7 +94,7 @@ if exist "$(ProjectDir)..\..\third_party\ffmpeg\bin\*.dll" copy /Y "$(ProjectDir
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(ProjectDir)d3d11rhi;$(ProjectDir)..\..\third_party\libraw;$(ProjectDir)..\..\third_party\ffmpeg\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)d3d11rhi;$(ProjectDir)..\..\third_party\prebuilt\libraw\libraw;$(ProjectDir)..\..\third_party\prebuilt\ffmpeg\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -103,12 +103,12 @@ if exist "$(ProjectDir)..\..\third_party\ffmpeg\bin\*.dll" copy /Y "$(ProjectDir
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalLibraryDirectories>$(ProjectDir)..\..\third_party\libraw\lib;$(ProjectDir)..\..\third_party\ffmpeg\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\..\third_party\prebuilt\libraw;$(ProjectDir)..\..\third_party\prebuilt\ffmpeg\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>d3d11.lib;dxgi.lib;d3dcompiler.lib;dxguid.lib;d3d9.lib;libraw.lib;avformat.lib;avcodec.lib;avutil.lib;swscale.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>copy /Y "$(ProjectDir)..\..\third_party\libraw\buildfiles\release-x86_64\libraw.dll" "$(OutDir)libraw.dll"
-if exist "$(ProjectDir)..\..\third_party\ffmpeg\bin\*.dll" copy /Y "$(ProjectDir)..\..\third_party\ffmpeg\bin\*.dll" "$(OutDir)"</Command>
+      <Command>copy /Y "$(ProjectDir)..\..\third_party\prebuilt\libraw\libraw.dll" "$(OutDir)libraw.dll"
+if exist "$(ProjectDir)..\..\third_party\prebuilt\ffmpeg\bin\*.dll" copy /Y "$(ProjectDir)..\..\third_party\prebuilt\ffmpeg\bin\*.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
