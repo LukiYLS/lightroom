@@ -10,6 +10,10 @@ obj/
 *.obj
 *.log
 
+# Exception: prebuilt binaries should be tracked via Git LFS
+!third_party/prebuilt/**/*.dll
+!third_party/prebuilt/**/*.lib
+
 # Visual Studio
 .vs/
 *.user
@@ -67,6 +71,10 @@ third_party/**/.vs/
 third_party/**/*.vcxproj.user
 third_party/**/bin/
 third_party/**/object/
+
+# Exception: prebuilt binaries should be tracked
+!third_party/prebuilt/**/*.lib
+!third_party/prebuilt/**/*.dll
 
 
 
