@@ -463,8 +463,9 @@ namespace RenderCore
 		if (UAVRHI)
 		{
 			ComPtr<ID3D11UnorderedAccessView> D3D11UAV = UAVRHI->GetNativeUAV();
+			ID3D11UnorderedAccessView* uavPtr = D3D11UAV.Get();
 			uint32_t InitialCount = -1;
-			Impl->D3D11RHI->GetDeviceContext()->CSSetUnorderedAccessViews(UAVIndex, 1, &D3D11UAV, &InitialCount);
+			Impl->D3D11RHI->GetDeviceContext()->CSSetUnorderedAccessViews(UAVIndex, 1, &uavPtr, &InitialCount);
 		}
 	}
 

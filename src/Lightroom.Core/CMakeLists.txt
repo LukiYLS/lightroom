@@ -45,7 +45,7 @@ set(RELEASE_DEFINITIONS
 # 包含目录
 set(INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/d3d11rhi
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/prebuilt/libraw/libraw
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/prebuilt/libraw
     ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/prebuilt/ffmpeg/include
 )
 

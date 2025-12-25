@@ -63,7 +63,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(ProjectDir)d3d11rhi;$(ProjectDir)..\..\third_party\prebuilt\libraw\libraw;$(ProjectDir)..\..\third_party\prebuilt\ffmpeg\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)d3d11rhi;$(ProjectDir)..\..\third_party\prebuilt\libraw;$(ProjectDir)..\..\third_party\prebuilt\ffmpeg\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <Optimization>Disabled</Optimization>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
@@ -94,7 +94,7 @@ if exist "$(ProjectDir)..\..\third_party\prebuilt\ffmpeg\bin\*.dll" copy /Y "$(P
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(ProjectDir)d3d11rhi;$(ProjectDir)..\..\third_party\prebuilt\libraw\libraw;$(ProjectDir)..\..\third_party\prebuilt\ffmpeg\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)d3d11rhi;$(ProjectDir)..\..\third_party\prebuilt\libraw;$(ProjectDir)..\..\third_party\prebuilt\ffmpeg\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
