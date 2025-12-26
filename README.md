@@ -2,6 +2,8 @@
 
 A professional-grade image and video editing application built with WPF frontend and C++ backend, featuring GPU-accelerated rendering and real-time adjustments.
 
+![App](screenshot/App.png)
+
 ## Features
 
 ### Image Editing
