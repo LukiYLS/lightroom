@@ -102,15 +102,10 @@ void* RenderTargetManager::CreateRenderTarget(uint32_t width, uint32_t height) {
             return nullptr;
         }
 
-        // 2. 在 D3D9 中打开共享纹理
-        if (!m_D3D9Interop->CreateSharedTextureFromD3D11(
+        // 2. 在 D3D9 中打开共享纹理并获取 Surface（直接用于 WPF D3DImage）
+        if (!m_D3D9Interop->CreateSurfaceFromSharedHandle(
                 info->D3D11SharedHandle, width, height,
-                &info->D3D9SharedTexture, &info->D3D9SharedSurface)) {
-            return nullptr;
-        }
-
-        // 3. 创建用于 WPF D3DImage 的表面
-        if (!m_D3D9Interop->CreateRenderTargetSurface(width, height, &info->D3D9Surface)) {
+                &info->D3D9SharedSurface)) {
             return nullptr;
         }
 
@@ -140,9 +135,8 @@ RenderTargetManager::RenderTargetInfo* RenderTargetManager::GetRenderTargetInfo(
 
 void* RenderTargetManager::GetD3D9SharedHandle(void* handle) {
     auto* info = GetRenderTargetInfo(handle);
-    if (info && info->D3D9Surface) {
-        // 返回 D3D9 表面的指针（WPF D3DImage 需要）
-        return info->D3D9Surface;
+    if (info && info->D3D9SharedSurface) {
+        return info->D3D9SharedSurface;
     }
     return nullptr;
 }

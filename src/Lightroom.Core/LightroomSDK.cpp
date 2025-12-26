@@ -355,15 +355,6 @@ void RenderToTarget(void* renderTargetHandle) {
             }
         }
         
-        // 使用 GPU 拷贝从 D3D11 共享纹理拷贝到 D3D9 表面
-        if (renderTargetInfo->D3D9SharedSurface && renderTargetInfo->D3D9Surface && g_D3D9InteropPtr) {
-            g_D3D9InteropPtr->CopySurface(
-                renderTargetInfo->D3D9SharedSurface,
-                renderTargetInfo->D3D9Surface,
-                renderTargetInfo->Width,
-                renderTargetInfo->Height
-            );
-        }
     }
     catch (const std::exception& e) {
     }

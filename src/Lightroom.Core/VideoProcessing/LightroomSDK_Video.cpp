@@ -275,20 +275,9 @@ bool RenderVideoFrame(void* renderTargetHandle) {
                 if (d3d11Context) {
                     d3d11Context->Flush();
                 }
-            }
+            }            
         }
-        
-        // 使用 GPU 拷贝从 D3D11 共享纹理拷贝到 D3D9 表面（与 RenderToTarget 中的逻辑一致）
-        // 注意：renderTargetInfo 已经在上面定义过了，直接使用
-        if (renderTargetInfo && renderTargetInfo->D3D9SharedSurface && renderTargetInfo->D3D9Surface && g_D3D9InteropPtr) {
-            ScopedTimer copyTimer("RenderVideoFrame_D3D9Copy");
-            g_D3D9InteropPtr->CopySurface(
-                renderTargetInfo->D3D9SharedSurface,
-                renderTargetInfo->D3D9Surface,
-                renderTargetInfo->Width,
-                renderTargetInfo->Height
-            );
-        }
+
         
         // Print statistics every 100 frames
         static int frameCount = 0;

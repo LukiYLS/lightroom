@@ -26,18 +26,14 @@ public:
         HANDLE D3D11SharedHandle;
         
         // D3D9 资源（用于 WPF D3DImage）
-        IDirect3DTexture9* D3D9SharedTexture;  // 从 D3D11 共享纹理打开
-        IDirect3DSurface9* D3D9SharedSurface;  // D3D9SharedTexture 的表面
-        IDirect3DSurface9* D3D9Surface;        // WPF D3DImage 使用的表面
+        IDirect3DSurface9* D3D9SharedSurface;  // 从 D3D11 共享纹理打开的 Surface（直接用于 WPF）
         
         uint32_t Width;
         uint32_t Height;
         
         RenderTargetInfo()
             : D3D11SharedHandle(nullptr)
-            , D3D9SharedTexture(nullptr)
             , D3D9SharedSurface(nullptr)
-            , D3D9Surface(nullptr)
             , Width(0)
             , Height(0)
         {
@@ -47,14 +43,6 @@ public:
             if (D3D9SharedSurface) {
                 D3D9SharedSurface->Release();
                 D3D9SharedSurface = nullptr;
-            }
-            if (D3D9SharedTexture) {
-                D3D9SharedTexture->Release();
-                D3D9SharedTexture = nullptr;
-            }
-            if (D3D9Surface) {
-                D3D9Surface->Release();
-                D3D9Surface = nullptr;
             }
         }
     };
