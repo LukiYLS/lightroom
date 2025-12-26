@@ -31,17 +31,6 @@ public:
     };
     void SetYUVFormat(YUVFormat format) { m_YUVFormat = format; }
     YUVFormat GetYUVFormat() const { return m_YUVFormat; }
-    
-    // Multi-texture input (for separated Y/U/V planes)
-    // If input is a single texture (like NV12), use Execute method
-    // If input is separated Y/U/V textures, use this method
-    bool ExecuteMultiTexture(
-        std::shared_ptr<RenderCore::RHITexture2D> yTexture,
-        std::shared_ptr<RenderCore::RHITexture2D> uTexture,
-        std::shared_ptr<RenderCore::RHITexture2D> vTexture,
-        std::shared_ptr<RenderCore::RHITexture2D> outputTarget,
-        uint32_t width, uint32_t height);
-
 public:
     bool InitializeShaderResources();
     

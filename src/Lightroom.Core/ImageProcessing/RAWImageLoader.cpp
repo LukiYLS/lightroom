@@ -88,20 +88,16 @@ std::shared_ptr<RenderCore::RHITexture2D> RAWImageLoader::Load(
     std::shared_ptr<RenderCore::DynamicRHI> rhi) {
     
     if (!rhi) {
-        std::cerr << "[RAWImageLoader] RHI is null" << std::endl;
         return nullptr;
     }
 
     // 打开 RAW 文件
     if (!m_LibRawWrapper->OpenFile(filePath)) {
-        std::wcerr << L"[RAWImageLoader] Failed to open RAW file: " << filePath << std::endl;
-        std::cerr << "[RAWImageLoader] Error: " << m_LibRawWrapper->GetError() << std::endl;
         return nullptr;
     }
 
     // 提取元数据
     if (!ExtractRAWMetadata(filePath)) {
-        std::wcerr << L"[RAWImageLoader] Failed to extract metadata from: " << filePath << std::endl;
         return nullptr;
     }
 
@@ -116,8 +112,6 @@ std::shared_ptr<RenderCore::RHITexture2D> RAWImageLoader::Load(
     std::vector<uint8_t> rgbData;
     uint32_t processedWidth, processedHeight;
     if (!m_LibRawWrapper->ProcessRAW(rgbData, processedWidth, processedHeight)) {
-        std::wcerr << L"[RAWImageLoader] Failed to process RAW data: " << filePath << std::endl;
-        std::cerr << "[RAWImageLoader] Error: " << m_LibRawWrapper->GetError() << std::endl;
         return nullptr;
     }
 
@@ -143,12 +137,8 @@ std::shared_ptr<RenderCore::RHITexture2D> RAWImageLoader::Load(
     );
 
     if (!texture) {
-        std::cerr << "[RAWImageLoader] Failed to create texture via RHI" << std::endl;
         return nullptr;
     }
-
-    std::wcout << L"[RAWImageLoader] Successfully loaded RAW image: " << filePath 
-               << L" (" << processedWidth << L"x" << processedHeight << L")" << std::endl;
     return texture;
 }
 
@@ -164,15 +154,12 @@ bool RAWImageLoader::LoadRAWData(const std::wstring& filePath,
     // 打开 RAW 文件（如果尚未打开）
     if (!m_LibRawWrapper->IsOpen()) {
         if (!m_LibRawWrapper->OpenFile(filePath)) {
-            std::wcerr << L"[RAWImageLoader] Failed to open RAW file: " << filePath << std::endl;
             return false;
         }
     }
 
     // 解包 RAW 数据（16-bit Bayer pattern）
     if (!m_LibRawWrapper->UnpackRAW(rawData, outWidth, outHeight)) {
-        std::wcerr << L"[RAWImageLoader] Failed to unpack RAW data: " << filePath << std::endl;
-        std::cerr << "[RAWImageLoader] Error: " << m_LibRawWrapper->GetError() << std::endl;
         return false;
     }
 
@@ -183,15 +170,12 @@ bool RAWImageLoader::ExtractRAWMetadata(const std::wstring& filePath) {
     // 确保文件已打开
     if (!m_LibRawWrapper->IsOpen()) {
         if (!m_LibRawWrapper->OpenFile(filePath)) {
-            std::wcerr << L"[RAWImageLoader] Failed to open RAW file for metadata: " << filePath << std::endl;
             return false;
         }
     }
 
     // 提取元数据
     if (!m_LibRawWrapper->ExtractMetadata(m_RAWInfo)) {
-        std::wcerr << L"[RAWImageLoader] Failed to extract metadata: " << filePath << std::endl;
-        std::cerr << "[RAWImageLoader] Error: " << m_LibRawWrapper->GetError() << std::endl;
         return false;
     }
 

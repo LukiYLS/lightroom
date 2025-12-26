@@ -49,15 +49,14 @@ protected:
     };
     bool CompileShaders(const char* vsCode, const char* psCode, CompiledShader& outShader);
 
-    // 通用的渲染设置（子类可以重写以自定义）
+    // 通用的渲染设置
     virtual void SetupRenderState(ID3D11DeviceContext* d3d11Context,
                                   std::shared_ptr<RenderCore::RHITexture2D> inputTexture,
                                   uint32_t width, uint32_t height);
     
-    // 执行绘制（子类可以重写以自定义）
+    // 执行绘制
     virtual void Draw(ID3D11DeviceContext* d3d11Context);
 
-    // 子类需要实现的钩子方法
     virtual void UpdateConstantBuffers(uint32_t width, uint32_t height) {}
     virtual void SetConstantBuffers() {}
     virtual void SetShaderResources(std::shared_ptr<RenderCore::RHITexture2D> inputTexture) {}
@@ -65,12 +64,10 @@ protected:
     std::shared_ptr<RenderCore::DynamicRHI> m_RHI;
     std::shared_ptr<RenderCore::RHICommandContext> m_CommandContext;
 
-    // 公共资源（所有节点共享）
     std::shared_ptr<RenderCore::RHIVertexBuffer> m_CommonVertexBuffer;
     std::shared_ptr<RenderCore::RHISamplerState> m_CommonSamplerState;
     bool m_CommonResourcesInitialized = false;
 
-    // 当前渲染使用的 shader（由子类设置）
     CompiledShader* m_CurrentShader = nullptr;
 };
 

@@ -16,11 +16,10 @@ public:
     ImageProcessor(std::shared_ptr<RenderCore::DynamicRHI> rhi);
     ~ImageProcessor();
 
-    // 从文件加载图片到 RHI 纹理（工厂方法 - 自动选择加载器）
-    // 返回的纹理由调用者管理生命周期
+    // 从文件加载图片到 RHI 纹理
     std::shared_ptr<RenderCore::RHITexture2D> LoadImageFromFile(const char* imagePath);
 
-    // 从文件加载图片到 RHI 纹理（宽字符路径版本）
+    // 从文件加载图片到 RHI 纹理
     std::shared_ptr<RenderCore::RHITexture2D> LoadImageFromFile(const std::wstring& imagePath);
 
     // 获取最后加载的图片尺寸

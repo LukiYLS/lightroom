@@ -108,12 +108,8 @@ std::shared_ptr<RenderCore::RHITexture2D> StandardImageLoader::Load(
     );
 
     if (!texture) {
-        std::cerr << "[StandardImageLoader] Failed to create texture via RHI" << std::endl;
         return nullptr;
     }
-
-    std::wcout << L"[StandardImageLoader] Successfully loaded image: " << filePath 
-               << L" (" << width << L"x" << height << L")" << std::endl;
     return texture;
 }
 
@@ -131,7 +127,6 @@ bool StandardImageLoader::LoadImageDataWithWIC(const std::wstring& imagePath,
     Microsoft::WRL::ComPtr<IWICImagingFactory> wicFactory;
     HRESULT hr = CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&wicFactory));
     if (FAILED(hr)) {
-        std::cerr << "[StandardImageLoader] Failed to create WIC factory: 0x" << std::hex << hr << std::endl;
         return false;
     }
 
@@ -139,9 +134,6 @@ bool StandardImageLoader::LoadImageDataWithWIC(const std::wstring& imagePath,
     Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder;
     hr = wicFactory->CreateDecoderFromFilename(imagePath.c_str(), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnLoad, &decoder);
     if (FAILED(hr)) {
-        std::cerr << "[StandardImageLoader] Failed to create decoder (HR: 0x" << std::hex << hr << ")" << std::endl;
-        _com_error err(hr);
-        std::cerr << "[StandardImageLoader] Error message: " << err.ErrorMessage() << std::endl;
         return false;
     }
 
@@ -149,7 +141,6 @@ bool StandardImageLoader::LoadImageDataWithWIC(const std::wstring& imagePath,
     Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame;
     hr = decoder->GetFrame(0, &frame);
     if (FAILED(hr)) {
-        std::cerr << "[StandardImageLoader] Failed to get frame: 0x" << std::hex << hr << std::endl;
         return false;
     }
 
@@ -157,7 +148,6 @@ bool StandardImageLoader::LoadImageDataWithWIC(const std::wstring& imagePath,
     UINT width, height;
     hr = frame->GetSize(&width, &height);
     if (FAILED(hr)) {
-        std::cerr << "[StandardImageLoader] Failed to get image size: 0x" << std::hex << hr << std::endl;
         return false;
     }
 
@@ -168,13 +158,11 @@ bool StandardImageLoader::LoadImageDataWithWIC(const std::wstring& imagePath,
     Microsoft::WRL::ComPtr<IWICFormatConverter> converter;
     hr = wicFactory->CreateFormatConverter(&converter);
     if (FAILED(hr)) {
-        std::cerr << "[StandardImageLoader] Failed to create format converter: 0x" << std::hex << hr << std::endl;
         return false;
     }
 
     hr = converter->Initialize(frame.Get(), GUID_WICPixelFormat32bppBGRA, WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeCustom);
     if (FAILED(hr)) {
-        std::cerr << "[StandardImageLoader] Failed to initialize format converter: 0x" << std::hex << hr << std::endl;
         return false;
     }
 
@@ -185,7 +173,6 @@ bool StandardImageLoader::LoadImageDataWithWIC(const std::wstring& imagePath,
 
     hr = converter->CopyPixels(nullptr, outStride, bufferSize, outData.data());
     if (FAILED(hr)) {
-        std::cerr << "[StandardImageLoader] Failed to copy pixels: 0x" << std::hex << hr << std::endl;
         return false;
     }
 

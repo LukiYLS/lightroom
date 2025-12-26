@@ -64,7 +64,6 @@ bool RenderNode::InitializeCommonResources() {
                                         m_CommonSamplerState != nullptr);
     }
     catch (const std::exception& e) {
-        std::cerr << "[RenderNode] Failed to initialize common resources: " << e.what() << std::endl;
         m_CommonResourcesInitialized = false;
     }
 
@@ -84,13 +83,11 @@ bool RenderNode::CompileShaders(const char* vsCode, const char* psCode, Compiled
 
     RenderCore::D3D11DynamicRHI* d3d11RHI = dynamic_cast<RenderCore::D3D11DynamicRHI*>(m_RHI.get());
     if (!d3d11RHI) {
-        std::cerr << "[RenderNode] Failed to cast to D3D11DynamicRHI" << std::endl;
         return false;
     }
     
     ID3D11Device* device = d3d11RHI->GetDevice();
     if (!device) {
-        std::cerr << "[RenderNode] Failed to get D3D11 device" << std::endl;
         return false;
     }
 
@@ -99,12 +96,9 @@ bool RenderNode::CompileShaders(const char* vsCode, const char* psCode, Compiled
     HRESULT hr = D3DCompile(vsCode, strlen(vsCode), nullptr, nullptr, nullptr, "main", "vs_5_0", 0, 0, 
                            &outShader.Blob, &errorBlob);
     if (FAILED(hr)) {
-        std::cerr << "[RenderNode] VS compile failed with HRESULT: 0x" << std::hex << hr << std::dec << std::endl;
         if (errorBlob) {
             const char* errorMsg = (char*)errorBlob->GetBufferPointer();
             std::cerr << "[RenderNode] VS compile error:\n" << errorMsg << std::endl;
-        } else {
-            std::cerr << "[RenderNode] No error blob available" << std::endl;
         }
         return false;
     }
@@ -113,7 +107,6 @@ bool RenderNode::CompileShaders(const char* vsCode, const char* psCode, Compiled
     hr = device->CreateVertexShader(outShader.Blob->GetBufferPointer(), outShader.Blob->GetBufferSize(), 
                                      nullptr, &outShader.VS);
     if (FAILED(hr)) {
-        std::cerr << "[RenderNode] Failed to create VS: 0x" << std::hex << hr << std::endl;
         return false;
     }
 
@@ -123,12 +116,9 @@ bool RenderNode::CompileShaders(const char* vsCode, const char* psCode, Compiled
     hr = D3DCompile(psCode, strlen(psCode), nullptr, nullptr, nullptr, "main", "ps_5_0", 0, 0, 
                     &psBlob, &errorBlob);
     if (FAILED(hr)) {
-        std::cerr << "[RenderNode] PS compile failed with HRESULT: 0x" << std::hex << hr << std::dec << std::endl;
         if (errorBlob) {
             const char* errorMsg = (char*)errorBlob->GetBufferPointer();
             std::cerr << "[RenderNode] PS compile error:\n" << errorMsg << std::endl;
-        } else {
-            std::cerr << "[RenderNode] No error blob available" << std::endl;
         }
         return false;
     }
@@ -137,7 +127,6 @@ bool RenderNode::CompileShaders(const char* vsCode, const char* psCode, Compiled
     hr = device->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(), 
                                     nullptr, &outShader.PS);
     if (FAILED(hr)) {
-        std::cerr << "[RenderNode] Failed to create PS: 0x" << std::hex << hr << std::endl;
         return false;
     }
 
@@ -150,7 +139,6 @@ bool RenderNode::CompileShaders(const char* vsCode, const char* psCode, Compiled
     hr = device->CreateInputLayout(layout, 2, outShader.Blob->GetBufferPointer(), 
                                     outShader.Blob->GetBufferSize(), &outShader.InputLayout);
     if (FAILED(hr)) {
-        std::cerr << "[RenderNode] Failed to create input layout: 0x" << std::hex << hr << std::endl;
         return false;
     }
 
@@ -212,7 +200,6 @@ bool RenderNode::Execute(std::shared_ptr<RenderCore::RHITexture2D> inputTexture,
     }
 
     if (!m_CurrentShader) {
-        std::cerr << "[RenderNode] Current shader not set" << std::endl;
         return false;
     }
 

@@ -52,7 +52,6 @@ std::shared_ptr<RenderCore::RHITexture2D> ImageProcessor::LoadImageFromFile(cons
                 wpath.pop_back();
             }
         } else {
-            std::cerr << "[ImageProcessor] Failed to convert path to wide string: " << imagePath << std::endl;
             return nullptr;
         }
     }
@@ -64,14 +63,12 @@ std::shared_ptr<RenderCore::RHITexture2D> ImageProcessor::LoadImageFromFile(cons
     // 选择适当的加载器
     IImageLoader* loader = SelectLoader(imagePath);
     if (!loader) {
-        std::cerr << "[ImageProcessor] No suitable loader found for: " << std::endl;
         return nullptr;
     }
 
     // 使用选定的加载器加载图片
     auto texture = loader->Load(imagePath, m_RHI);
     if (!texture) {
-        std::cerr << "[ImageProcessor] Failed to load image" << std::endl;
         return nullptr;
     }
 
@@ -92,11 +89,6 @@ std::shared_ptr<RenderCore::RHITexture2D> ImageProcessor::LoadImageFromFile(cons
         // 清除 RAW 信息
         m_LastRAWInfo.reset();
     }
-
-    std::wcout << L"[ImageProcessor] Successfully loaded " 
-               << (m_LastFormat == ImageFormat::RAW ? L"RAW" : L"standard")
-               << L" image: " << imagePath 
-               << L" (" << m_LastImageWidth << L"x" << m_LastImageHeight << L")" << std::endl;
     return texture;
 }
 

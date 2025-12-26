@@ -67,8 +67,8 @@ private:
     
     AVFormatContext* m_FormatContext;
     AVCodecContext* m_CodecContext;
-    AVFrame* m_Frame;              // Hardware frame (D3D11 texture)
-    AVFrame* m_SoftwareFrame;      // Software frame (system memory, for av_hwframe_transfer_data)
+    AVFrame* m_Frame;              
+    AVFrame* m_SoftwareFrame;      
     AVBufferRef* m_HwDeviceCtx;
     AVBufferRef* m_HwFramesCtx;
     

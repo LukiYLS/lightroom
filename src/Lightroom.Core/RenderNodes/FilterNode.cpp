@@ -43,7 +43,7 @@ bool FilterNode::InitializeShaderResources() {
     }
 
     // ---------------------------------------------------------
-    // Vertex Shader (保持不变)
+    // Vertex Shader
     // ---------------------------------------------------------
     const char* vsCode = R"(
         struct VSInput {
@@ -63,11 +63,8 @@ bool FilterNode::InitializeShaderResources() {
     )";
 
     // ---------------------------------------------------------
-    // Pixel Shader (完全重写)
+    // Pixel Shader
     // ---------------------------------------------------------
-    // 修正点：
-    // 1. 适配水平长条纹理 (Width = Size*Size, Height = Size)
-    // 2. 实现双切片混合 (模拟 3D 纹理的三线性插值)，消除颜色断层
     const char* psCode = R"(
         Texture2D inputTexture : register(t0);
         Texture2D lutTexture : register(t1);
@@ -157,12 +154,9 @@ bool FilterNode::InitializeShaderResources() {
         }
     )";
 
-    std::cout << "[FilterNode] Compiling shaders..." << std::endl;
     if (!CompileShaders(vsCode, psCode, m_Shader)) {
-        std::cerr << "[FilterNode] Failed to compile shaders" << std::endl;
         return false;
     }
-    std::cout << "[FilterNode] Shaders compiled successfully" << std::endl;
 
     FilterConstantBuffer params = {};
     params.LUTSize = 0.0f;
@@ -174,7 +168,6 @@ bool FilterNode::InitializeShaderResources() {
     );
 
     if (!m_ParamsBuffer) {
-        std::cerr << "[FilterNode] Failed to create constant buffer" << std::endl;
         return false;
     }
 
@@ -191,14 +184,13 @@ void FilterNode::CleanupShaderResources() {
 }
 
 // ---------------------------------------------------------
-// LUT 转换逻辑 (核心修复)
+// LUT 转换逻辑
 // ---------------------------------------------------------
 std::vector<uint8_t> FilterNode::ConvertLUTTo2DTexture(uint32_t lutSize, const float* lutData) {
     if (!lutData || lutSize == 0) {
         return {};
     }
 
-    // 修正：使用水平长条布局
     // 宽度 = Size * Size (Blue 沿 X 轴展开)
     // 高度 = Size (Green 沿 Y 轴)
     uint32_t width = lutSize * lutSize;
@@ -248,16 +240,12 @@ std::vector<uint8_t> FilterNode::ConvertLUTTo2DTexture(uint32_t lutSize, const f
 
 bool FilterNode::LoadLUT(uint32_t lutSize, const float* lutData) {
     if (!lutData || lutSize == 0 || lutSize > 256) {
-        std::cerr << "[FilterNode] Invalid LUT parameters: lutSize=" << lutSize << std::endl;
         return false;
     }
-
-    std::cout << "[FilterNode] Loading LUT: " << lutSize << "^3" << std::endl;
 
     // 转换数据
     std::vector<uint8_t> textureData = ConvertLUTTo2DTexture(lutSize, lutData);
     if (textureData.empty()) {
-        std::cerr << "[FilterNode] Failed to convert LUT data" << std::endl;
         return false;
     }
 
@@ -277,7 +265,6 @@ bool FilterNode::LoadLUT(uint32_t lutSize, const float* lutData) {
     );
 
     if (!m_LUTTexture) {
-        std::cerr << "[FilterNode] Failed to create LUT texture" << std::endl;
         return false;
     }
 
@@ -290,29 +277,22 @@ bool FilterNode::LoadLUT(uint32_t lutSize, const float* lutData) {
         params.Intensity = m_Intensity;
         m_CommandContext->RHIUpdateUniformBuffer(m_ParamsBuffer, &params);
     }
-
-    std::cout << "[FilterNode] LUT Loaded. Texture Size: " << width << "x" << height << std::endl;
     return true;
 }
 
 bool FilterNode::LoadLUTFromTexture(std::shared_ptr<RenderCore::RHITexture2D> lutTexture, uint32_t lutSize) {
     if (!lutTexture || lutSize == 0 || lutSize > 256) {
-        std::cerr << "[FilterNode] Invalid LUT texture parameters" << std::endl;
         return false;
     }
 
     m_LUTTexture = lutTexture;
     m_LUTSize = lutSize;
     
-    // 更新 constant buffer（将在下次渲染时通过 UpdateConstantBuffers 更新）
-
-    std::cout << "[FilterNode] LUT texture loaded successfully: " << lutSize << "x" << lutSize << "x" << lutSize << std::endl;
     return true;
 }
 
 bool FilterNode::LoadLUTFromFile(const char* filePath) {
     if (!filePath) {
-        std::cerr << "[FilterNode] Invalid file path" << std::endl;
         return false;
     }
     
@@ -335,7 +315,6 @@ bool FilterNode::LoadLUTFromFile(const char* filePath) {
                 wFilePath.pop_back();
             }
         } else {
-            std::cerr << "[FilterNode] Failed to convert file path to wide string" << std::endl;
             return false;
         }
     }
@@ -343,7 +322,6 @@ bool FilterNode::LoadLUTFromFile(const char* filePath) {
     // 打开文件（使用宽字符路径）
     std::filebuf fileBuf;
     if (!fileBuf.open(wFilePath, std::ios::in)) {
-        std::cerr << "[FilterNode] Failed to open file: " << filePath << std::endl;
         return false;
     }
     std::istream file(&fileBuf);
@@ -400,7 +378,6 @@ bool FilterNode::LoadLUTFromFile(const char* filePath) {
     fileBuf.close();
 
     if (!foundLUTSize || lutData.size() != lutSize * lutSize * lutSize * 3) {
-        std::cerr << "[FilterNode] Invalid LUT file format" << std::endl;
         return false;
     }
 

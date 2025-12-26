@@ -34,24 +34,20 @@ bool FFmpegVideoLoader::Open(const std::wstring& filePath) {
         // 硬件解码器打开成功（codec 支持硬件解码）
         m_ActiveLoader = m_HardwareLoader.get();
         m_IsOpen = true;
-        std::cout << "[FFmpegVideoLoader] Video opened with hardware decoder" << std::endl;
         return true;
     }
     
     // 硬件解码失败，回退到软件解码
     m_HardwareLoader.reset();
-    std::cout << "[FFmpegVideoLoader] Hardware decoder not available, falling back to software decoder" << std::endl;
     
     m_SoftwareLoader = std::make_unique<FFmpegSoftwareVideoLoader>();
     if (!m_SoftwareLoader->Open(filePath)) {
-        std::cerr << "[FFmpegVideoLoader] Failed to open video with software decoder" << std::endl;
         m_SoftwareLoader.reset();
         return false;
     }
     
     m_ActiveLoader = m_SoftwareLoader.get();
     m_IsOpen = true;
-    std::cout << "[FFmpegVideoLoader] Video opened with software decoder" << std::endl;
     return true;
 }
 

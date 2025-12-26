@@ -642,8 +642,6 @@ bool GetHistogramData(void* renderTargetHandle, uint32_t* outHistogram) {
         Microsoft::WRL::ComPtr<ID3D11Texture2D> stagingTexture;
         HRESULT hr = device->CreateTexture2D(&stagingDesc, nullptr, stagingTexture.GetAddressOf());
         if (FAILED(hr)) {
-            std::cerr << "[SDK] GetHistogramData: Failed to create staging texture: 0x" 
-                      << std::hex << hr << std::dec << std::endl;
             return false;
         }
         
@@ -657,8 +655,6 @@ bool GetHistogramData(void* renderTargetHandle, uint32_t* outHistogram) {
         D3D11_MAPPED_SUBRESOURCE mapped;
         hr = context->Map(stagingTexture.Get(), 0, D3D11_MAP_READ, 0, &mapped);
         if (FAILED(hr)) {
-            std::cerr << "[SDK] GetHistogramData: Failed to map staging texture: 0x" 
-                      << std::hex << hr << std::dec << std::endl;
             return false;
         }
         

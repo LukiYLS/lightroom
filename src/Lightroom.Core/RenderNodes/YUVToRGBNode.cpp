@@ -28,14 +28,12 @@ namespace LightroomCore {
         }
 
         if (!CompileShaderForFormat(m_YUVFormat)) {
-            std::cerr << "[YUVToRGBNode] Failed to compile shader for format" << std::endl;
             return false;
         }
 
         // Create constant buffer
         m_ParamsBuffer = m_RHI->RHICreateUniformBuffer(sizeof(YUVToRGBCBuffer));
         if (!m_ParamsBuffer) {
-            std::cerr << "[YUVToRGBNode] Failed to create constant buffer" << std::endl;
             return false;
         }
 
@@ -53,7 +51,7 @@ namespace LightroomCore {
     }
 
     bool YUVToRGBNode::CompileShaderForFormat(YUVFormat format) {
-        // Vertex shader (same for all formats)
+        // Vertex shader
         const char* vsCode = R"(
         struct VSInput {
             float2 Position : POSITION;
@@ -133,9 +131,7 @@ namespace LightroomCore {
 
         const char* psCode = (format == YUVFormat::NV12) ? psCodeNV12 : psCodeYUV420P;
 
-        // Use base class CompileShaders method
         if (!CompileShaders(vsCode, psCode, m_Shader)) {
-            std::cerr << "[YUVToRGBNode] Failed to compile shaders" << std::endl;
             return false;
         }
 
@@ -152,7 +148,6 @@ namespace LightroomCore {
         }
 
         if (!m_Shader.VS || !m_Shader.PS || !m_Shader.InputLayout || !m_ParamsBuffer) {
-            std::cerr << "[YUVToRGBNode] Shader resources not properly initialized" << std::endl;
             return false;
         }
 
@@ -161,17 +156,6 @@ namespace LightroomCore {
 
         // Use base class Execute method (it will call our hook methods)
         return RenderNode::Execute(inputTexture, outputTarget, width, height);
-    }
-
-    bool YUVToRGBNode::ExecuteMultiTexture(
-        std::shared_ptr<RenderCore::RHITexture2D> yTexture,
-        std::shared_ptr<RenderCore::RHITexture2D> uTexture,
-        std::shared_ptr<RenderCore::RHITexture2D> vTexture,
-        std::shared_ptr<RenderCore::RHITexture2D> outputTarget,
-        uint32_t width, uint32_t height) {
-        // For now, this is a placeholder - would need to bind multiple textures
-        // For NV12, we use Execute with single texture
-        return false;
     }
 
     void YUVToRGBNode::UpdateConstantBuffers(uint32_t width, uint32_t height) {

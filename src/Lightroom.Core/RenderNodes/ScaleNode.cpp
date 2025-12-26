@@ -213,14 +213,10 @@ bool ScaleNode::Execute(std::shared_ptr<RenderCore::RHITexture2D> inputTexture,
     }
 
     if (!m_Shader.VS || !m_Shader.PS || !m_Shader.InputLayout || !m_ConstantBuffer) {
-        std::cerr << "[ScaleNode] Shader resources not properly initialized" << std::endl;
         return false;
     }
 
-    // 设置当前 shader（基类 Execute 会使用）
     m_CurrentShader = &m_Shader;
-
-    // 使用基类的 Execute 方法（它会调用我们的钩子方法）
     return RenderNode::Execute(inputTexture, outputTarget, width, height);
 }
 

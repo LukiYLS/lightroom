@@ -5,28 +5,7 @@
 #include <vector>
 #include <memory>
 
-// LibRaw 前向声明
-// 如果 LibRaw 已集成，取消注释以下行
-// #define LIBRAW_AVAILABLE
-
 #ifdef LIBRAW_AVAILABLE
-// 防止 Winsock 冲突 - 必须在包含任何 Windows 头文件之前
-// LibRaw 的头文件会在 Windows 下包含 winsock2.h
-// 我们需要确保在包含 LibRaw 之前，winsock2.h 已经被正确包含
-
-// 方案：在项目级别定义 WIN32_LEAN_AND_MEAN 和 NOMINMAX
-// 这样所有文件在包含 windows.h 之前都会先定义这些宏
-// LibRaw 的头文件会检查这些宏并正确包含 winsock2.h
-
-// 注意：LibRaw 的头文件 libraw_datastream.h 和 internal/defines.h 
-// 会在 Windows 下包含 winsock2.h，但它们会检查 LIBRAW_NO_WINSOCK2
-// 如果定义了 LIBRAW_NO_WINSOCK2，则不会包含 winsock2.h
-
-// 我们选择不定义 LIBRAW_NO_WINSOCK2，让 LibRaw 包含 winsock2.h
-// 但我们需要确保在包含 LibRaw 之前，windows.h 还没有被包含
-// 或者如果已经被包含，需要确保 winsock2.h 在 windows.h 之前
-
-// 最佳方案：在包含 LibRaw 之前，先包含 winsock2.h
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -38,11 +17,7 @@
 // LibRaw 会检查并避免重复包含
 #include <winsock2.h>
 #include <ws2tcpip.h>
-
-// 然后包含 windows.h（如果需要，但 WIN32_LEAN_AND_MEAN 会阻止它包含 winsock.h）
 #include <windows.h>
-
-// 现在可以安全地包含 LibRaw 头文件
 #include <libraw/libraw.h>
 #endif
 

@@ -1,4 +1,4 @@
-#include "RGBToYUVNode.h"
+﻿#include "RGBToYUVNode.h"
 #include "../d3d11rhi/D3D11RHI.h"
 #include "../d3d11rhi/D3D11UniformBuffer.h"
 #include "../d3d11rhi/D3D11Texture2D.h"
@@ -45,7 +45,6 @@ namespace LightroomCore {
         )";
 
 		// 3. Pixel Shader - Y Plane
-		// [修正] 直接采样 .rgb。不要手动交换 R/B，否则人脸会变蓝。
 		const char* psCodeY = R"(
             Texture2D RGBTexture : register(t0);
             SamplerState LinearSampler : register(s0);
@@ -89,12 +88,7 @@ namespace LightroomCore {
 		if (!CompileShaders(vsCode, psCodeU, m_UShader)) return false;
 		if (!CompileShaders(vsCode, psCodeV, m_VShader)) return false;
 
-		// 创建常量缓冲区 (虽然现在的简化 Shader 暂时没用到 Resolution，但保留以备后续修正采样偏移)
 		m_ParamsBuffer = m_RHI->RHICreateUniformBuffer(sizeof(YUVConvertConstants));
-
-		// 初始化采样器 (必须是 Linear Clamp)
-		// 假设 RenderNode 基类中已经创建了 m_CommonSamplerState 且为 Linear
-		// 如果没有，需要在这里创建一个
 
 		m_ShaderResourcesInitialized = true;
 		return true;

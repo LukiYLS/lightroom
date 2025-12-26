@@ -40,7 +40,6 @@ public:
     std::shared_ptr<RenderCore::RHITexture2D> GetLUTTexture() const { return m_LUTTexture; }
 
 protected:
-    // 重写基类的钩子方法
     virtual void UpdateConstantBuffers(uint32_t width, uint32_t height) override;
     virtual void SetConstantBuffers() override;
     virtual void SetShaderResources(std::shared_ptr<RenderCore::RHITexture2D> inputTexture) override;

@@ -59,7 +59,6 @@ namespace LightroomCore {
         if (!s_FFmpegInitialized) {
             avformat_network_init();
             s_FFmpegInitialized = true;
-            std::cout << "[FFmpegSoftwareVideoLoader] FFmpeg initialized" << std::endl;
         }
     }
 
@@ -80,7 +79,6 @@ namespace LightroomCore {
         // Convert wide char path to UTF-8
         int pathLen = WideCharToMultiByte(CP_UTF8, 0, filePath.c_str(), -1, nullptr, 0, nullptr, nullptr);
         if (pathLen <= 0) {
-            std::cerr << "[FFmpegSoftwareVideoLoader] Failed to convert path to UTF-8" << std::endl;
             return false;
         }
 
@@ -90,7 +88,6 @@ namespace LightroomCore {
         // Open input file
         m_FormatContext = avformat_alloc_context();
         if (avformat_open_input(&m_FormatContext, utf8Path.data(), nullptr, nullptr) < 0) {
-            std::cerr << "[FFmpegSoftwareVideoLoader] Failed to open input file" << std::endl;
             avformat_free_context(m_FormatContext);
             m_FormatContext = nullptr;
             return false;
@@ -98,7 +95,6 @@ namespace LightroomCore {
 
         // Find stream info
         if (avformat_find_stream_info(m_FormatContext, nullptr) < 0) {
-            std::cerr << "[FFmpegSoftwareVideoLoader] Failed to find stream info" << std::endl;
             Close();
             return false;
         }
@@ -113,7 +109,6 @@ namespace LightroomCore {
         }
 
         if (m_VideoStreamIndex == -1) {
-            std::cerr << "[FFmpegSoftwareVideoLoader] No video stream found" << std::endl;
             Close();
             return false;
         }
@@ -122,35 +117,26 @@ namespace LightroomCore {
         AVCodecParameters* codecpar = m_FormatContext->streams[m_VideoStreamIndex]->codecpar;
         const AVCodec* codec = avcodec_find_decoder(codecpar->codec_id);
         if (!codec) {
-            std::cerr << "[FFmpegSoftwareVideoLoader] Codec not found for codec_id: " << codecpar->codec_id << std::endl;
-            std::cerr << "[FFmpegSoftwareVideoLoader] This codec may not be compiled in FFmpeg" << std::endl;
-            std::cerr << "[FFmpegSoftwareVideoLoader] For ProRes (codec_id=" << AV_CODEC_ID_PRORES 
-                      << "), ensure FFmpeg was compiled with ProRes decoder support" << std::endl;
             Close();
             return false;
         }
         
-        std::cout << "[FFmpegSoftwareVideoLoader] Using software decoder for codec: " << codec->name 
-                  << " (codec_id: " << codecpar->codec_id << ")" << std::endl;
 
         // Allocate codec context
         m_CodecContext = avcodec_alloc_context3(codec);
         if (!m_CodecContext) {
-            std::cerr << "[FFmpegSoftwareVideoLoader] Failed to allocate codec context" << std::endl;
             Close();
             return false;
         }
 
         // Copy codec parameters
         if (avcodec_parameters_to_context(m_CodecContext, codecpar) < 0) {
-            std::cerr << "[FFmpegSoftwareVideoLoader] Failed to copy codec parameters" << std::endl;
             Close();
             return false;
         }
 
         // Open codec
         if (avcodec_open2(m_CodecContext, codec, nullptr) < 0) {
-            std::cerr << "[FFmpegSoftwareVideoLoader] Failed to open codec" << std::endl;
             Close();
             return false;
         }
@@ -159,7 +145,6 @@ namespace LightroomCore {
         m_Frame = av_frame_alloc();
         m_ConvertedFrame = av_frame_alloc();
         if (!m_Frame || !m_ConvertedFrame) {
-            std::cerr << "[FFmpegSoftwareVideoLoader] Failed to allocate frames" << std::endl;
             Close();
             return false;
         }
@@ -180,8 +165,6 @@ namespace LightroomCore {
         m_CurrentFrameIndex = 0;
         m_IsOpen = true;
 
-        std::cout << "[FFmpegSoftwareVideoLoader] Video opened: " << m_Metadata.width
-            << "x" << m_Metadata.height << " @ " << m_Metadata.frameRate << " fps" << std::endl;
 
         return true;
     }
@@ -284,7 +267,6 @@ namespace LightroomCore {
             yWidth, yHeight, 1);
         
         if (!m_YTexture) {
-            std::cerr << "[FFmpegSoftwareVideoLoader] Failed to create Y texture" << std::endl;
             return false;
         }
         
@@ -295,7 +277,6 @@ namespace LightroomCore {
             uvWidth, uvHeight, 1);
         
         if (!m_UTexture) {
-            std::cerr << "[FFmpegSoftwareVideoLoader] Failed to create U texture" << std::endl;
             m_YTexture.reset();
             return false;
         }
@@ -307,7 +288,6 @@ namespace LightroomCore {
             uvWidth, uvHeight, 1);
         
         if (!m_VTexture) {
-            std::cerr << "[FFmpegSoftwareVideoLoader] Failed to create V texture" << std::endl;
             m_YTexture.reset();
             m_UTexture.reset();
             return false;
@@ -326,9 +306,6 @@ namespace LightroomCore {
         
         m_CachedYUVWidth = width;
         m_CachedYUVHeight = height;
-        
-        std::cout << "[FFmpegSoftwareVideoLoader] Created YUV textures: Y=" << yWidth << "x" << yHeight
-                  << ", U/V=" << uvWidth << "x" << uvHeight << std::endl;
         
         return true;
     }
@@ -386,7 +363,6 @@ namespace LightroomCore {
                         SWS_BILINEAR, nullptr, nullptr, nullptr);
                     
                     if (!m_SwsContext) {
-                        std::cerr << "[FFmpegSoftwareVideoLoader] Failed to create SWS context for format conversion" << std::endl;
                         return nullptr;
                     }
                     
@@ -396,7 +372,6 @@ namespace LightroomCore {
                     m_ConvertedFrame->height = height;
                     int ret = av_frame_get_buffer(m_ConvertedFrame, 32);
                     if (ret < 0) {
-                        std::cerr << "[FFmpegSoftwareVideoLoader] Failed to allocate converted frame buffer" << std::endl;
                         return nullptr;
                     }
                 }
@@ -407,7 +382,6 @@ namespace LightroomCore {
                     m_ConvertedFrame->data, m_ConvertedFrame->linesize);
                 
                 frameToUse = m_ConvertedFrame;
-                std::cout << "[FFmpegSoftwareVideoLoader] Converted format from " << pixFmt << " to YUV420P" << std::endl;
             }
         }
         
@@ -471,12 +445,10 @@ namespace LightroomCore {
             m_CachedYUVToRGBNode = std::make_unique<YUVToRGBNode>(rhi);
             m_CachedYUVToRGBNode->SetYUVFormat(YUVToRGBNode::YUVFormat::YUV420P);
             if (!m_CachedYUVToRGBNode->InitializeShaderResources()) {
-                std::cerr << "[FFmpegSoftwareVideoLoader] Failed to initialize YUV to RGB shader resources" << std::endl;
                 m_CachedYUVToRGBNode.reset();
                 return nullptr;
             }
             m_CachedRHI = rhi;
-            std::cout << "[FFmpegSoftwareVideoLoader] Initialized cached YUVToRGBNode" << std::endl;
         }
         
         // 4. Prepare output RGB texture
@@ -487,7 +459,6 @@ namespace LightroomCore {
                 width, height, 1);
             
             if (!m_CachedRGBTexture) {
-                std::cerr << "[FFmpegSoftwareVideoLoader] Failed to create RGB output texture" << std::endl;
                 return nullptr;
             }
             
@@ -506,7 +477,6 @@ namespace LightroomCore {
                 uD3D11Tex->GetSRV(), 
                 vD3D11Tex->GetSRV());
         } else {
-            std::cerr << "[FFmpegSoftwareVideoLoader] Failed to get SRVs from YUV textures" << std::endl;
             return nullptr;
         }
         
@@ -523,7 +493,6 @@ namespace LightroomCore {
         m_CachedYUVToRGBNode->SetCustomShaderResourceViewsYUV420P(nullptr, nullptr, nullptr);
         
         if (!bSuccess) {
-            std::cerr << "[FFmpegSoftwareVideoLoader] Failed to convert YUV to RGB" << std::endl;
             return nullptr;
         }
         

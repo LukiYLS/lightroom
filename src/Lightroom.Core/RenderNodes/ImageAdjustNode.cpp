@@ -112,8 +112,6 @@ bool ImageAdjustNode::InitializeShaderResources() {
     )";
 
     // 图像调整像素 shader（基础框架 - 等待逐个实现算法）
-    // TODO: 逐个添加算法实现，方便调试
-    // 将 shader 代码拆分成多个部分以避免字符串过长错误
     const char* psCodePart1 = R"(
         cbuffer AdjustParams : register(b0) {
             // 基本调整
@@ -179,9 +177,6 @@ bool ImageAdjustNode::InitializeShaderResources() {
             float2 TexCoord : TEXCOORD0;
         };
         
-        // ============================================
-        // 算法实现区域 - 逐个添加算法函数
-        // ============================================
     )";
     
     const char* psCodePart2 = R"(
@@ -878,31 +873,31 @@ void ImageAdjustNode::UpdateConstantBuffers(uint32_t width, uint32_t height) {
     cbData.Vibrance = m_Params.vibrance;
     cbData.Saturation = m_Params.saturation;
     
-            // HSL 调整
-            cbData.HueAdjustments[0] = m_Params.hueRed / 100.0f;
-            cbData.HueAdjustments[1] = m_Params.hueOrange / 100.0f;
-            cbData.HueAdjustments[2] = m_Params.hueYellow / 100.0f;
-            cbData.HueAdjustments[3] = m_Params.hueGreen / 100.0f;
-            cbData.HueAdjustments2[0] = m_Params.hueAqua / 100.0f;
-            cbData.HueAdjustments2[1] = m_Params.hueBlue / 100.0f;
-            cbData.HueAdjustments2[2] = m_Params.huePurple / 100.0f;
-            cbData.HueAdjustments2[3] = m_Params.hueMagenta / 100.0f;
-            cbData.SatAdjustments[0] = m_Params.satRed;
-            cbData.SatAdjustments[1] = m_Params.satOrange;
-            cbData.SatAdjustments[2] = m_Params.satYellow;
-            cbData.SatAdjustments[3] = m_Params.satGreen;
-            cbData.SatAdjustments2[0] = m_Params.satAqua;
-            cbData.SatAdjustments2[1] = m_Params.satBlue;
-            cbData.SatAdjustments2[2] = m_Params.satPurple;
-            cbData.SatAdjustments2[3] = m_Params.satMagenta;
-            cbData.LumAdjustments[0] = m_Params.lumRed;
-            cbData.LumAdjustments[1] = m_Params.lumOrange;
-            cbData.LumAdjustments[2] = m_Params.lumYellow;
-            cbData.LumAdjustments[3] = m_Params.lumGreen;
-            cbData.LumAdjustments2[0] = m_Params.lumAqua;
-            cbData.LumAdjustments2[1] = m_Params.lumBlue;
-            cbData.LumAdjustments2[2] = m_Params.lumPurple;
-            cbData.LumAdjustments2[3] = m_Params.lumMagenta;
+    // HSL 调整
+    cbData.HueAdjustments[0] = m_Params.hueRed / 100.0f;
+    cbData.HueAdjustments[1] = m_Params.hueOrange / 100.0f;
+    cbData.HueAdjustments[2] = m_Params.hueYellow / 100.0f;
+    cbData.HueAdjustments[3] = m_Params.hueGreen / 100.0f;
+    cbData.HueAdjustments2[0] = m_Params.hueAqua / 100.0f;
+    cbData.HueAdjustments2[1] = m_Params.hueBlue / 100.0f;
+    cbData.HueAdjustments2[2] = m_Params.huePurple / 100.0f;
+    cbData.HueAdjustments2[3] = m_Params.hueMagenta / 100.0f;
+    cbData.SatAdjustments[0] = m_Params.satRed;
+    cbData.SatAdjustments[1] = m_Params.satOrange;
+    cbData.SatAdjustments[2] = m_Params.satYellow;
+    cbData.SatAdjustments[3] = m_Params.satGreen;
+    cbData.SatAdjustments2[0] = m_Params.satAqua;
+    cbData.SatAdjustments2[1] = m_Params.satBlue;
+    cbData.SatAdjustments2[2] = m_Params.satPurple;
+    cbData.SatAdjustments2[3] = m_Params.satMagenta;
+    cbData.LumAdjustments[0] = m_Params.lumRed;
+    cbData.LumAdjustments[1] = m_Params.lumOrange;
+    cbData.LumAdjustments[2] = m_Params.lumYellow;
+    cbData.LumAdjustments[3] = m_Params.lumGreen;
+    cbData.LumAdjustments2[0] = m_Params.lumAqua;
+    cbData.LumAdjustments2[1] = m_Params.lumBlue;
+    cbData.LumAdjustments2[2] = m_Params.lumPurple;
+    cbData.LumAdjustments2[3] = m_Params.lumMagenta;
     
     cbData.Sharpness = m_Params.sharpness;
     // 调试输出
@@ -951,7 +946,6 @@ bool ImageAdjustNode::Execute(std::shared_ptr<RenderCore::RHITexture2D> inputTex
     }
 
     if (!m_Shader.VS || !m_Shader.PS || !m_Shader.InputLayout || !m_ParamsBuffer) {
-        std::cerr << "[ImageAdjustNode] Shader resources not properly initialized" << std::endl;
         return false;
     }
 

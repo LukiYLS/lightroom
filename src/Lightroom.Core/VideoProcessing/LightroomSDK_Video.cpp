@@ -17,12 +17,7 @@
 #include <algorithm>
 
 using namespace RenderCore;
-// 不完全使用 LightroomCore 命名空间，避免与 C API 类型冲突
-// using namespace LightroomCore;
 
-// 使用 C API 的类型（避免与 C++ 命名空间冲突）
-// 注意：VideoMetadata 和 VideoFormat 在 C API (LightroomSDKTypes.h) 和 C++ 命名空间 (LightroomCore) 中都有定义
-// 在函数参数中使用 struct VideoMetadata 来明确使用 C API 的类型
 
 // 外部全局变量（在 LightroomSDK.cpp 中定义）
 extern std::shared_ptr<RenderCore::DynamicRHI> g_DynamicRHI;
