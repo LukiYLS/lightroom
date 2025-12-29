@@ -32,8 +32,8 @@ extern "C" {
     // 加载图片到渲染目标
     LIGHTROOM_API bool LoadImageToTarget(void* renderTargetHandle, const char* imagePath);
     
-    // 渲染到渲染目标纹理（现在用于触发刷新，不再需要颜色参数）
-    LIGHTROOM_API void RenderToTarget(void* renderTargetHandle);
+    // 渲染到渲染目标纹理（双缓冲+拷贝策略）
+    LIGHTROOM_API bool RenderToTarget(void* renderTargetHandle);
     
     // 调整渲染目标大小
     LIGHTROOM_API void ResizeRenderTarget(void* renderTargetHandle, uint32_t width, uint32_t height);
@@ -105,7 +105,7 @@ extern "C" {
     // 返回是否成功
     LIGHTROOM_API bool SeekVideoToFrame(void* renderTargetHandle, int64_t frameIndex);
     
-    // 读取并渲染视频帧（用于播放循环）
+    // 读取并渲染视频帧（用于播放循环，双缓冲+拷贝策略）
     // 返回是否成功
     LIGHTROOM_API bool RenderVideoFrame(void* renderTargetHandle);
     

@@ -223,6 +223,12 @@ bool RenderVideoFrame(void* renderTargetHandle) {
         using namespace LightroomCore;
         ScopedTimer totalTimer("RenderVideoFrame_Total");
         
+        // 【双缓冲+拷贝策略】获取Back Buffer进行渲染
+        auto outputTexture = g_RenderTargetManager->AcquireNextRenderBuffer(renderTargetHandle);
+        if (!outputTexture) {
+            return false;
+        }
+        
         // 读取下一帧
         std::shared_ptr<RenderCore::RHITexture2D> frameTexture;
         {
@@ -236,19 +242,14 @@ bool RenderVideoFrame(void* renderTargetHandle) {
         // 更新 ImageTexture（用于渲染图）
         data->ImageTexture = frameTexture;
         
-        // 获取输出纹理
+        // 获取渲染目标信息
         using RenderTargetInfo = LightroomCore::RenderTargetManager::RenderTargetInfo;
         RenderTargetInfo* renderTargetInfo = g_RenderTargetManager->GetRenderTargetInfo(renderTargetHandle);
-        if (!renderTargetInfo || !renderTargetInfo->RHIRenderTarget) {
+        if (!renderTargetInfo) {
             return false;
         }
         
-        std::shared_ptr<RenderCore::RHITexture2D> outputTexture = g_RenderTargetManager->GetRHITexture(renderTargetHandle);
-        if (!outputTexture) {
-            return false;
-        }
-        
-        // 执行渲染图
+        // 执行渲染图到Back Buffer
         {
             ScopedTimer renderGraphTimer("RenderVideoFrame_RenderGraph");
             if (!data->RenderGraph->Execute(
@@ -278,7 +279,6 @@ bool RenderVideoFrame(void* renderTargetHandle) {
             }            
         }
 
-        
         // Print statistics every 100 frames
         static int frameCount = 0;
         frameCount++;
@@ -287,7 +287,8 @@ bool RenderVideoFrame(void* renderTargetHandle) {
             VideoPerformanceProfiler::GetInstance().ClearOldRecords(200);
         }
         
-        return true;
+        // 【双缓冲+拷贝策略】将Back Buffer的内容复制到Front Buffer
+        return g_RenderTargetManager->PresentBackBuffer(renderTargetHandle);
     }
     catch (const std::exception& e) {
         return false;

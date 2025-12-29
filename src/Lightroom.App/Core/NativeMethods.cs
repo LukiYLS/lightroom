@@ -32,8 +32,9 @@ namespace Lightroom.App.Core
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         public static extern bool LoadImageToTarget(IntPtr renderTargetHandle, string imagePath);
 
+        // 渲染到目标（双缓冲+拷贝策略，内部处理，WPF端无需关心缓冲区切换）
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        public static extern void RenderToTarget(IntPtr renderTargetHandle);
+        public static extern bool RenderToTarget(IntPtr renderTargetHandle);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         public static extern void ResizeRenderTarget(IntPtr renderTargetHandle, uint width, uint height);
@@ -172,6 +173,7 @@ namespace Lightroom.App.Core
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         public static extern bool SeekVideoToFrame(IntPtr renderTargetHandle, long frameIndex);
 
+        // 渲染视频帧（双缓冲+拷贝策略，内部处理，WPF端无需关心缓冲区切换）
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         public static extern bool RenderVideoFrame(IntPtr renderTargetHandle);
 

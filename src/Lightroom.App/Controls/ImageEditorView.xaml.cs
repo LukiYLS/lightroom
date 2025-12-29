@@ -97,6 +97,23 @@ namespace Lightroom.App.Controls
                             NativeMethods.RenderToTarget(_renderTargetHandle);
                         }
                         
+                        // 更新DirtyRect以刷新显示（不需要切换SetBackBuffer）
+                        if (_d3dImage != null)
+                        {
+                            _d3dImage.Lock();
+                            try
+                            {
+                                if (_d3dImage.PixelWidth > 0 && _d3dImage.PixelHeight > 0)
+                                {
+                                    _d3dImage.AddDirtyRect(new Int32Rect(0, 0, _d3dImage.PixelWidth, _d3dImage.PixelHeight));
+                                }
+                            }
+                            finally
+                            {
+                                _d3dImage.Unlock();
+                            }
+                        }
+                        
                         // 显示视频控制栏
                         if (VideoControlsBorder != null)
                         {
@@ -283,19 +300,25 @@ namespace Lightroom.App.Controls
             try
             {
                 _renderCount++;
+                bool renderSuccess = false;
                 
                 // 如果是视频且正在播放，渲染下一帧
                 if (_isVideo && _isPlaying && !_isSeeking)
                 {
-                    NativeMethods.RenderVideoFrame(_renderTargetHandle);
+                    renderSuccess = NativeMethods.RenderVideoFrame(_renderTargetHandle);
                 }
                 else
                 {
                     // 渲染到目标（如果已加载图片则显示图片，否则显示黑色）
-                    NativeMethods.RenderToTarget(_renderTargetHandle);
+                    renderSuccess = NativeMethods.RenderToTarget(_renderTargetHandle);
                 }
 
-                // 更新 D3DImage
+                // 如果渲染失败，跳过这一帧
+                if (!renderSuccess)
+                    return;
+
+                // 更新 D3DImage（不需要切换SetBackBuffer，只需要标记脏区域）
+                // Front Buffer的指针不会改变，C++端已经将内容复制到Front Buffer
                 if (_d3dImage != null)
                 {
                     _d3dImage.Lock();
@@ -430,16 +453,42 @@ namespace Lightroom.App.Controls
                 _isResizing = true;
 
                 // 保存当前状态
-                string? savedImagePath = _currentImagePath;
                 double savedZoomLevel = _zoomLevel;
                 bool savedIsVideo = _isVideo;
                 bool savedIsPlaying = _isPlaying;
+                
+                // 对于视频，保存当前播放位置
+                long savedVideoFrame = -1;
+                if (savedIsVideo)
+                {
+                    savedVideoFrame = NativeMethods.GetCurrentVideoFrame(_renderTargetHandle);
+                }
 
-                // 调用 SDK 更新渲染目标尺寸
+                // 调用 SDK 更新渲染目标尺寸（双缓冲+拷贝策略，不会导致画面变黑）
                 NativeMethods.ResizeRenderTarget(_renderTargetHandle, newWidth, newHeight);
                 System.Diagnostics.Debug.WriteLine($"[ImageEditorView] Resized render target to {newWidth}x{newHeight}");
 
-                // 获取新的共享句柄并更新 D3DImage
+                // 先渲染一帧到新Buffer，确保有内容（避免显示空白）
+                // 对于视频，恢复播放位置并渲染
+                if (savedIsVideo && savedVideoFrame >= 0)
+                {
+                    NativeMethods.SeekVideoToFrame(_renderTargetHandle, savedVideoFrame);
+                    if (savedIsPlaying)
+                    {
+                        NativeMethods.RenderVideoFrame(_renderTargetHandle);
+                    }
+                    else
+                    {
+                        NativeMethods.RenderToTarget(_renderTargetHandle);
+                    }
+                }
+                else if (!savedIsVideo && !string.IsNullOrEmpty(_currentImagePath))
+                {
+                    // 对于图片，立即渲染
+                    NativeMethods.RenderToTarget(_renderTargetHandle);
+                }
+
+                // 现在更新D3DImage的SetBackBuffer（此时新Buffer已经有内容了）
                 IntPtr newSharedHandle = NativeMethods.GetRenderTargetSharedHandle(_renderTargetHandle);
                 if (newSharedHandle != IntPtr.Zero && _d3dImage != null)
                 {
@@ -447,7 +496,14 @@ namespace Lightroom.App.Controls
                     _d3dImage.Lock();
                     try
                     {
+                        // 只在resize时更新SetBackBuffer（此时新Buffer已经有内容，不会显示空白）
                         _d3dImage.SetBackBuffer(System.Windows.Interop.D3DResourceType.IDirect3DSurface9, _sharedHandle, true);
+                        
+                        // 立即标记脏区域以刷新显示
+                        if (_d3dImage.PixelWidth > 0 && _d3dImage.PixelHeight > 0)
+                        {
+                            _d3dImage.AddDirtyRect(new Int32Rect(0, 0, _d3dImage.PixelWidth, _d3dImage.PixelHeight));
+                        }
                     }
                     finally
                     {
@@ -455,14 +511,11 @@ namespace Lightroom.App.Controls
                     }
                 }
 
-                // 如果之前有加载文件，需要重新加载
-                if (!string.IsNullOrEmpty(savedImagePath))
-                {
-                    // 延迟重新加载文件，等待 resize 完成
-                    Dispatcher.BeginInvoke(new Action(() => {
-                        LoadImage(savedImagePath);
-                        
-                        // 恢复视频播放状态
+                // 延迟处理，恢复状态
+                Dispatcher.BeginInvoke(new Action(() => {
+                    try
+                    {
+                        // 恢复播放状态
                         if (savedIsVideo)
                         {
                             _isVideo = savedIsVideo;
@@ -492,14 +545,16 @@ namespace Lightroom.App.Controls
                             _zoomLevel = savedZoomLevel;
                             UpdateZoom();
                         }
-                        
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[ImageEditorView] Error in resize callback: {ex.Message}");
+                    }
+                    finally
+                    {
                         _isResizing = false;
-                    }), DispatcherPriority.Loaded);
-                }
-                else
-                {
-                    _isResizing = false;
-                }
+                    }
+                }), DispatcherPriority.Loaded);
             }
             catch (Exception ex)
             {
@@ -800,6 +855,23 @@ namespace Lightroom.App.Controls
                     
                     // 立即渲染当前帧
                     NativeMethods.RenderVideoFrame(_renderTargetHandle);
+                    
+                    // 更新DirtyRect以刷新显示（不需要切换SetBackBuffer）
+                    if (_d3dImage != null)
+                    {
+                        _d3dImage.Lock();
+                        try
+                        {
+                            if (_d3dImage.PixelWidth > 0 && _d3dImage.PixelHeight > 0)
+                            {
+                                _d3dImage.AddDirtyRect(new Int32Rect(0, 0, _d3dImage.PixelWidth, _d3dImage.PixelHeight));
+                            }
+                        }
+                        finally
+                        {
+                            _d3dImage.Unlock();
+                        }
+                    }
                     
                     // 更新显示
                     UpdateVideoProgress();

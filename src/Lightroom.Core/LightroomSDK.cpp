@@ -230,133 +230,102 @@ bool LoadImageToTarget(void* renderTargetHandle, const char* imagePath) {
     }
 }
 
-void RenderToTarget(void* renderTargetHandle) {
+bool RenderToTarget(void* renderTargetHandle) {
     if (!renderTargetHandle || !g_RenderTargetManager) {
-        return;
+        return false;
     }
     
     auto it = g_RenderTargetData.find(renderTargetHandle);
     if (it == g_RenderTargetData.end()) {
-        return;
+        return false;
     }
     
     auto& data = it->second;
     if (!data || !data->RenderGraph) {
-        return;
+        return false;
     }
     
     try {
         auto* renderTargetInfo = g_RenderTargetManager->GetRenderTargetInfo(renderTargetHandle);
-        if (!renderTargetInfo || !renderTargetInfo->RHIRenderTarget) {
-            return;
+        if (!renderTargetInfo) {
+            return false;
+        }
+        
+        // 【双缓冲+拷贝策略】获取Back Buffer进行渲染
+        auto outputTexture = g_RenderTargetManager->AcquireNextRenderBuffer(renderTargetHandle);
+        if (!outputTexture) {
+            return false;
         }
         
         // 如果是视频，使用视频渲染逻辑
         if (data->bIsVideo && data->VideoProcessor) {
             // 获取当前帧（不推进到下一帧，只是渲染当前帧）
-            // 如果还没有帧，尝试获取第一帧
             auto frameTexture = data->VideoProcessor->GetCurrentFrame();
             if (!frameTexture) {
-                // 如果当前帧不存在，尝试获取下一帧（这会解码第一帧）
                 frameTexture = data->VideoProcessor->GetNextFrame();
             }
             
-            if (frameTexture) {
+            if (frameTexture && data->RenderGraph) {
                 data->ImageTexture = frameTexture;
                 
-                // 获取输出纹理
-                auto outputTexture = g_RenderTargetManager->GetRHITexture(renderTargetHandle);
-                if (outputTexture && data->RenderGraph) {
-                    // 执行渲染图（这会应用所有调整参数）
-                    if (data->RenderGraph->Execute(
-                            frameTexture,
-                            outputTexture,
-                            renderTargetInfo->Width,
-                            renderTargetInfo->Height)) {
-                        // 刷新命令
-                        auto commandContext = g_DynamicRHI->GetDefaultCommandContext();
-                        if (commandContext) {
-                            commandContext->FlushCommands();
-                        }
-                        
-                        // 确保 D3D11 命令已提交到 GPU
-                        RenderCore::D3D11DynamicRHI* d3d11RHI = dynamic_cast<RenderCore::D3D11DynamicRHI*>(g_DynamicRHI.get());
-                        if (d3d11RHI) {
-                            ID3D11DeviceContext* d3d11Context = d3d11RHI->GetDeviceContext();
-                            if (d3d11Context) {
-                                d3d11Context->Flush();
-                            }
-                        }
-                    }
+                // 执行渲染图到Back Buffer
+                if (!data->RenderGraph->Execute(
+                        frameTexture,
+                        outputTexture,
+                        renderTargetInfo->Width,
+                        renderTargetInfo->Height)) {
+                    return false;
                 }
             }
-            
-            // 视频渲染后也需要复制到 D3D9 表面（与图片渲染逻辑一致）
-            // 注意：不要 return，继续执行后面的 D3D9 表面复制逻辑
         }
-        
         // 如果有图片，执行渲染图
-        if (data->bHasImage && data->ImageTexture) {
-            // 获取输出纹理（从 RenderTargetManager）
-            auto outputTexture = g_RenderTargetManager->GetRHITexture(renderTargetHandle);
-            if (!outputTexture) {
-                return;
-            }
-            
-            // 执行渲染图
+        else if (data->bHasImage && data->ImageTexture) {
+            // 执行渲染图到Back Buffer
             if (!data->RenderGraph->Execute(
-                    data->ImageTexture,  // 输入：加载的图片纹理
-                    outputTexture,       // 输出：渲染目标纹理
+                    data->ImageTexture,
+                    outputTexture,
                     renderTargetInfo->Width,
                     renderTargetInfo->Height)) {
-                return;
-            }
-            
-            // 渲染完成后，确保命令执行完成
-            // 优化：由于 RHIRenderTarget 直接使用 D3D11SharedTexture，无需拷贝
-            auto commandContext = g_DynamicRHI->GetDefaultCommandContext();
-            if (commandContext) {
-                commandContext->FlushCommands();
-            }
-            
-            // 确保 D3D11 命令已提交到 GPU
-            RenderCore::D3D11DynamicRHI* d3d11RHI = dynamic_cast<RenderCore::D3D11DynamicRHI*>(g_DynamicRHI.get());
-            if (d3d11RHI) {
-                ID3D11DeviceContext* d3d11Context = d3d11RHI->GetDeviceContext();
-                if (d3d11Context) {
-                    d3d11Context->Flush();
-                }
+                return false;
             }
         } else {
-            // 没有图片，清除渲染目标为红色（测试用）
+            // 没有图片，清除Back Buffer为黑色
             auto commandContext = g_DynamicRHI->GetDefaultCommandContext();
-            if (commandContext && renderTargetInfo->RHIRenderTarget) {
-                // 1. 先设置渲染目标（使用 RHIRenderTarget）
-                commandContext->SetRenderTarget(renderTargetInfo->RHIRenderTarget, 0);
-                
-                // 2. 设置视口
-                commandContext->SetViewPort(0, 0, renderTargetInfo->Width, renderTargetInfo->Height);
-                
-                // 3. 清除渲染目标为红色（使用 RHIRenderTarget）
-                commandContext->Clear(renderTargetInfo->RHIRenderTarget, core::FLinearColor(0, 0, 0, 1));
-                
-                // 4. 确保命令执行完成
-                commandContext->FlushCommands();
-                
-                // 5. 优化：由于 RHIRenderTarget 直接使用 D3D11SharedTexture，无需拷贝
-                // 只需确保 D3D11 命令已提交到 GPU
-                RenderCore::D3D11DynamicRHI* d3d11RHI = dynamic_cast<RenderCore::D3D11DynamicRHI*>(g_DynamicRHI.get());
-                if (d3d11RHI) {
-                    ID3D11DeviceContext* d3d11Context = d3d11RHI->GetDeviceContext();
-                    if (d3d11Context) {
-                        d3d11Context->Flush();
+            if (commandContext) {
+                // 获取Back Buffer的RenderTarget
+                using RenderTargetInfo = LightroomCore::RenderTargetManager::RenderTargetInfo;
+                RenderTargetInfo* info = g_RenderTargetManager->GetRenderTargetInfo(renderTargetHandle);
+                if (info) {
+                    auto* backBuffer = &info->BackBuffers[info->CurrentBackBuffer];
+                    if (backBuffer->RHIRenderTarget) {
+                        commandContext->SetRenderTarget(backBuffer->RHIRenderTarget, 0);
+                        commandContext->SetViewPort(0, 0, renderTargetInfo->Width, renderTargetInfo->Height);
+                        commandContext->Clear(backBuffer->RHIRenderTarget, core::FLinearColor(0, 0, 0, 1));
                     }
                 }
             }
         }
         
+        // 刷新渲染命令
+        auto commandContext = g_DynamicRHI->GetDefaultCommandContext();
+        if (commandContext) {
+            commandContext->FlushCommands();
+        }
+        
+        // 确保 D3D11 命令已提交到 GPU
+        RenderCore::D3D11DynamicRHI* d3d11RHI = dynamic_cast<RenderCore::D3D11DynamicRHI*>(g_DynamicRHI.get());
+        if (d3d11RHI) {
+            ID3D11DeviceContext* d3d11Context = d3d11RHI->GetDeviceContext();
+            if (d3d11Context) {
+                d3d11Context->Flush();
+            }
+        }
+        
+        // 【双缓冲+拷贝策略】将Back Buffer的内容复制到Front Buffer
+        return g_RenderTargetManager->PresentBackBuffer(renderTargetHandle);
     }
     catch (const std::exception& e) {
+        return false;
     }
 }
 
