@@ -122,6 +122,16 @@ extern "C" {
     // 返回是否为视频格式
     LIGHTROOM_API bool IsVideoFormat(const char* filePath);
     
+    // 提取视频第一帧作为缩略图
+    // videoPath: 视频文件路径（UTF-8 编码）
+    // outWidth: 输出宽度
+    // outHeight: 输出高度
+    // outData: 输出像素数据（BGRA32格式，由调用者分配内存，建议大小 width*height*4）
+    // maxWidth: 最大宽度（用于缩略图，0表示使用原始尺寸）
+    // maxHeight: 最大高度（用于缩略图，0表示使用原始尺寸）
+    // 返回是否成功，如果成功，outData包含像素数据
+    LIGHTROOM_API bool ExtractVideoThumbnail(const char* videoPath, uint32_t* outWidth, uint32_t* outHeight, uint8_t* outData, uint32_t maxWidth, uint32_t maxHeight);
+    
     // 导出图片相关 API
     // 从渲染目标导出图片到文件
     // renderTargetHandle: 渲染目标句柄

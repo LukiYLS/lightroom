@@ -12,9 +12,12 @@
 #include "../RenderGraph.h"
 #include "../RenderNodes/ImageAdjustNode.h"
 #include "../RenderNodes/ScaleNode.h"
+#include "../ImageProcessing/ImageExporter.h"
+#include "../d3d11rhi/D3D11Texture2D.h"
 #include <iostream>
 #include <string>
 #include <algorithm>
+#include <cstring>
 
 using namespace RenderCore;
 
@@ -352,5 +355,159 @@ bool IsVideoFormat(const char* filePath) {
     return ext == L"mp4" || ext == L"mov" || ext == L"avi" || 
            ext == L"mkv" || ext == L"m4v" || ext == L"flv" ||
            ext == L"webm" || ext == L"3gp";
+}
+
+bool ExtractVideoThumbnail(const char* videoPath, uint32_t* outWidth, uint32_t* outHeight, uint8_t* outData, uint32_t maxWidth, uint32_t maxHeight) {
+    if (!videoPath || !outWidth || !outHeight || !outData) {
+        return false;
+    }
+    
+    if (!g_DynamicRHI) {
+        return false;
+    }
+    
+    try {
+        // 转换路径
+        int pathLen = MultiByteToWideChar(CP_UTF8, 0, videoPath, -1, nullptr, 0);
+        if (pathLen <= 0) {
+            return false;
+        }
+        
+        std::wstring wVideoPath(pathLen - 1, L'\0');
+        MultiByteToWideChar(CP_UTF8, 0, videoPath, -1, &wVideoPath[0], pathLen);
+        
+        // 创建临时的VideoProcessor
+        auto videoProcessor = std::make_unique<LightroomCore::VideoProcessor>(g_DynamicRHI);
+        if (!videoProcessor->OpenVideo(wVideoPath)) {
+            return false;
+        }
+        
+        // 获取视频元数据
+        const LightroomCore::VideoMetadata* metadata = videoProcessor->GetMetadata();
+        if (!metadata) {
+            videoProcessor->CloseVideo();
+            return false;
+        }
+        
+        // 定位到第一帧
+        if (!videoProcessor->SeekToFrame(0)) {
+            videoProcessor->CloseVideo();
+            return false;
+        }
+        
+        // 读取第一帧
+        auto frameTexture = videoProcessor->GetCurrentFrame();
+        if (!frameTexture) {
+            videoProcessor->CloseVideo();
+            return false;
+        }
+        
+        // 获取原始尺寸
+        auto originalSize = frameTexture->GetSize();
+        uint32_t originalWidth = originalSize.x;
+        uint32_t originalHeight = originalSize.y;
+        
+        // 计算输出尺寸（保持宽高比）
+        uint32_t outputWidth = originalWidth;
+        uint32_t outputHeight = originalHeight;
+        
+        if (maxWidth > 0 && maxHeight > 0) {
+            float scaleX = static_cast<float>(maxWidth) / static_cast<float>(originalWidth);
+            float scaleY = static_cast<float>(maxHeight) / static_cast<float>(originalHeight);
+            float scale = std::min(scaleX, scaleY);
+            
+            outputWidth = static_cast<uint32_t>(originalWidth * scale);
+            outputHeight = static_cast<uint32_t>(originalHeight * scale);
+        }
+        
+        // 创建输出纹理（如果需要缩放）
+        std::shared_ptr<RenderCore::RHITexture2D> outputTexture = frameTexture;
+        if (outputWidth != originalWidth || outputHeight != originalHeight) {
+            // 需要缩放，创建缩放后的纹理
+            outputTexture = g_DynamicRHI->RHICreateTexture2D(
+                RenderCore::EPixelFormat::PF_B8G8R8A8,
+                RenderCore::ETextureCreateFlags::TexCreate_RenderTargetable | RenderCore::ETextureCreateFlags::TexCreate_ShaderResource,
+                outputWidth,
+                outputHeight,
+                1
+            );
+            
+            if (!outputTexture) {
+                videoProcessor->CloseVideo();
+                return false;
+            }
+            
+            // 使用ScaleNode进行缩放
+            LightroomCore::ScaleNode scaleNode(g_DynamicRHI);
+            scaleNode.SetInputImageSize(originalWidth, originalHeight);
+            scaleNode.SetZoomParams(1.0, 0.0, 0.0);
+            
+            if (!scaleNode.Execute(frameTexture, outputTexture, outputWidth, outputHeight)) {
+                videoProcessor->CloseVideo();
+                return false;
+            }
+        }
+        
+        // 刷新命令
+        auto commandContext = g_DynamicRHI->GetDefaultCommandContext();
+        if (commandContext) {
+            commandContext->FlushCommands();
+        }
+        
+        RenderCore::D3D11DynamicRHI* d3d11RHI = dynamic_cast<RenderCore::D3D11DynamicRHI*>(g_DynamicRHI.get());
+        if (d3d11RHI) {
+            ID3D11DeviceContext* d3d11Context = d3d11RHI->GetDeviceContext();
+            if (d3d11Context) {
+                d3d11Context->Flush();
+            }
+        }
+        
+        // 读取纹理数据
+        auto d3d11Texture = std::dynamic_pointer_cast<RenderCore::D3D11Texture2D>(outputTexture);
+        if (!d3d11Texture) {
+            videoProcessor->CloseVideo();
+            return false;
+        }
+        
+        ID3D11Texture2D* nativeTexture = d3d11Texture->GetNativeTex();
+        if (!nativeTexture) {
+            videoProcessor->CloseVideo();
+            return false;
+        }
+        
+        // 使用ImageExporter读取像素数据
+        LightroomCore::ImageExporter exporter(g_DynamicRHI);
+        uint32_t realWidth, realHeight, stride;
+        std::vector<uint8_t> imageData;
+        
+        if (!exporter.ReadD3D11TextureData(nativeTexture, realWidth, realHeight, imageData, stride)) {
+            videoProcessor->CloseVideo();
+            return false;
+        }
+        
+        // 验证读取的尺寸是否匹配
+        if (realWidth != outputWidth || realHeight != outputHeight) {
+            videoProcessor->CloseVideo();
+            return false;
+        }
+        
+        // 检查输出缓冲区大小
+        uint32_t requiredSize = outputWidth * outputHeight * 4;
+        if (imageData.size() < requiredSize) {
+            videoProcessor->CloseVideo();
+            return false;
+        }
+        
+        // 复制数据到输出缓冲区
+        *outWidth = outputWidth;
+        *outHeight = outputHeight;
+        memcpy(outData, imageData.data(), requiredSize);
+        
+        videoProcessor->CloseVideo();
+        return true;
+    }
+    catch (const std::exception& e) {
+        return false;
+    }
 }
 

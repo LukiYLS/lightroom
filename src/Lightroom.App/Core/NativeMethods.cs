@@ -186,6 +186,17 @@ namespace Lightroom.App.Core
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         public static extern bool IsVideoFormat(string filePath);
 
+        // 提取视频第一帧作为缩略图
+        // videoPath: 视频文件路径
+        // outWidth: 输出宽度
+        // outHeight: 输出高度
+        // outData: 输出像素数据（BGRA32格式，由调用者分配足够的内存，建议 maxWidth*maxHeight*4）
+        // maxWidth: 最大宽度（用于缩略图，0表示使用原始尺寸）
+        // maxHeight: 最大高度（用于缩略图，0表示使用原始尺寸）
+        // 返回是否成功
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        public static extern bool ExtractVideoThumbnail([MarshalAs(UnmanagedType.LPStr)] string videoPath, out uint outWidth, out uint outHeight, IntPtr outData, uint maxWidth, uint maxHeight);
+
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         public static extern bool ExportImage(IntPtr renderTargetHandle, [MarshalAs(UnmanagedType.LPStr)] string filePath, [MarshalAs(UnmanagedType.LPStr)] string format, uint quality);
 

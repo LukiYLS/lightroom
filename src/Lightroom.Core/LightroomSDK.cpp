@@ -542,13 +542,15 @@ bool GetHistogramData(void* renderTargetHandle, uint32_t* outHistogram) {
     
     try {
         // 获取渲染后的输出纹理（这是实际显示的内容，应该用于直方图计算）
+        // 注意：应该读取Front Buffer的内容（实际显示的内容），而不是Back Buffer
         auto* renderTargetInfo = g_RenderTargetManager->GetRenderTargetInfo(renderTargetHandle);
-        if (!renderTargetInfo || !renderTargetInfo->RHIRenderTarget) {
+        if (!renderTargetInfo) {
             return false;
         }
         
-        auto outputTexture = g_RenderTargetManager->GetRHITexture(renderTargetHandle);
-        if (!outputTexture) {
+        // 获取Front Buffer的纹理（实际显示的内容）
+        auto frontTexture = renderTargetInfo->FrontBuffer.RHITexture;
+        if (!frontTexture) {
             return false;
         }
         
@@ -558,17 +560,16 @@ bool GetHistogramData(void* renderTargetHandle, uint32_t* outHistogram) {
             return false;
         }
         
-        auto d3d11Texture = std::dynamic_pointer_cast<RenderCore::D3D11Texture2D>(outputTexture);
+        auto d3d11Texture = std::dynamic_pointer_cast<RenderCore::D3D11Texture2D>(frontTexture);
         if (!d3d11Texture) {
             return false;
         }
         
         ID3D11Texture2D* nativeTex = d3d11Texture->GetNativeTex();
         if (!nativeTex) {
-            // 尝试直接从RenderTargetInfo获取D3D11SharedTexture
-            auto* renderTargetInfo = g_RenderTargetManager->GetRenderTargetInfo(renderTargetHandle);
-            if (renderTargetInfo && renderTargetInfo->D3D11SharedTexture) {
-                nativeTex = renderTargetInfo->D3D11SharedTexture.Get();
+            // 尝试直接从Front Buffer获取D3D11SharedTexture
+            if (renderTargetInfo->FrontBuffer.D3D11SharedTexture) {
+                nativeTex = renderTargetInfo->FrontBuffer.D3D11SharedTexture.Get();
             } else {
                 return false;
             }

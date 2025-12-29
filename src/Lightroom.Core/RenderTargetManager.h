@@ -83,11 +83,9 @@ namespace LightroomCore {
 		RenderTargetInfo* GetRenderTargetInfo(void* handle);
 
 		// 获取 D3D9 Surface 指针 (用于 WPF D3DImage.SetBackBuffer)
-		// 注意：这个指针永远指向Front Buffer，不会改变（除非resize）
 		void* GetD3D9SharedHandle(void* handle);
 
 		// 获取 RHI 纹理 (用于传递给渲染管线)
-		// 注意：返回的是Back Buffer的纹理，用于渲染
 		std::shared_ptr<RenderCore::RHITexture2D> GetRHITexture(void* handle);
 
 		// 获取 DX11 Shared Handle (主要用于调试或扩展)
@@ -112,7 +110,10 @@ namespace LightroomCore {
 		bool InitResources(RenderTargetInfo* info, uint32_t width, uint32_t height);
 		
 		// 初始化单个缓冲区资源
-		bool InitBufferResources(BufferResources* buffer, uint32_t width, uint32_t height);
+		// buffer: 缓冲区资源
+		// width, height: 尺寸
+		// createD3D9Surface: 是否创建D3D9 Surface（Front Buffer需要，Back Buffer不需要）
+		bool InitBufferResources(BufferResources* buffer, uint32_t width, uint32_t height, bool createD3D9Surface = true);
 		
 		// 从旧缓冲区复制内容到新缓冲区（用于resize时保持画面）
 		bool CopyBufferContent(BufferResources* srcBuffer, BufferResources* dstBuffer);

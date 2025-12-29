@@ -27,9 +27,16 @@ namespace LightroomCore {
 	// -----------------------------------------------------------------------------
 	// 核心逻辑：初始化单个缓冲区资源
 	// -----------------------------------------------------------------------------
-	bool RenderTargetManager::InitBufferResources(BufferResources* buffer, uint32_t width, uint32_t height) {
-		if (!m_RHI || !m_D3D9Interop || !m_D3D9Interop->IsInitialized()) {
+	bool RenderTargetManager::InitBufferResources(BufferResources* buffer, uint32_t width, uint32_t height, bool createD3D9Surface) {
+		if (!m_RHI) {
 			return false;
+		}
+
+		// Front Buffer需要D3D9 Surface，需要检查D3D9Interop
+		if (createD3D9Surface) {
+			if (!m_D3D9Interop || !m_D3D9Interop->IsInitialized()) {
+				return false;
+			}
 		}
 
 		auto* d3d11RHI = dynamic_cast<D3D11DynamicRHI*>(m_RHI.get());
@@ -38,7 +45,8 @@ namespace LightroomCore {
 		ID3D11Device* d3d11Device = d3d11RHI->GetDevice();
 		if (!d3d11Device) return false;
 
-		// 创建支持共享的 D3D11 纹理
+		// 创建 D3D11 纹理
+		// Back Buffer不需要共享，所以不需要D3D11_RESOURCE_MISC_SHARED标志
 		D3D11_TEXTURE2D_DESC desc = {};
 		desc.Width = width;
 		desc.Height = height;
@@ -50,7 +58,13 @@ namespace LightroomCore {
 		desc.Usage = D3D11_USAGE_DEFAULT;
 		desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
 		desc.CPUAccessFlags = 0;
-		desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED;
+		
+		// 只有Front Buffer需要共享（给WPF使用）
+		if (createD3D9Surface) {
+			desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED;
+		} else {
+			desc.MiscFlags = 0;
+		}
 
 		HRESULT hr = d3d11Device->CreateTexture2D(&desc, nullptr, buffer->D3D11SharedTexture.ReleaseAndGetAddressOf());
 		if (FAILED(hr)) return false;
@@ -59,12 +73,29 @@ namespace LightroomCore {
 		hr = d3d11Device->CreateRenderTargetView(buffer->D3D11SharedTexture.Get(), nullptr, buffer->D3D11SharedRTV.ReleaseAndGetAddressOf());
 		if (FAILED(hr)) return false;
 
-		ComPtr<IDXGIResource> dxgiResource;
-		hr = buffer->D3D11SharedTexture.As(&dxgiResource);
-		if (FAILED(hr)) return false;
+		// 只有Front Buffer需要共享句柄和D3D9 Surface
+		if (createD3D9Surface) {
+			ComPtr<IDXGIResource> dxgiResource;
+			hr = buffer->D3D11SharedTexture.As(&dxgiResource);
+			if (FAILED(hr)) return false;
 
-		hr = dxgiResource->GetSharedHandle(&buffer->D3D11SharedHandle);
-		if (FAILED(hr) || !buffer->D3D11SharedHandle) return false;
+			hr = dxgiResource->GetSharedHandle(&buffer->D3D11SharedHandle);
+			if (FAILED(hr) || !buffer->D3D11SharedHandle) return false;
+
+			// D3D9 互操作：打开共享句柄
+			buffer->D3D9SharedSurface.Reset();
+			if (!m_D3D9Interop->CreateSurfaceFromSharedHandle(
+				buffer->D3D11SharedHandle,
+				width,
+				height,
+				buffer->D3D9SharedSurface.GetAddressOf())) {
+				return false;
+			}
+		} else {
+			// Back Buffer不需要共享句柄和D3D9 Surface
+			buffer->D3D11SharedHandle = nullptr;
+			buffer->D3D9SharedSurface.Reset();
+		}
 
 		auto d3d11RenderTarget = std::make_shared<D3D11RenderTarget>(d3d11RHI);
 
@@ -76,17 +107,6 @@ namespace LightroomCore {
 
 		buffer->RHIRenderTarget = d3d11RenderTarget;
 		buffer->RHITexture = buffer->RHIRenderTarget->GetTex();
-
-		// D3D9 互操作：打开共享句柄
-		buffer->D3D9SharedSurface.Reset();
-
-		if (!m_D3D9Interop->CreateSurfaceFromSharedHandle(
-			buffer->D3D11SharedHandle,
-			width,
-			height,
-			buffer->D3D9SharedSurface.GetAddressOf())) {
-			return false;
-		}
 
 		buffer->Width = width;
 		buffer->Height = height;
@@ -143,7 +163,8 @@ namespace LightroomCore {
 			}
 		}
 
-		context->Flush();
+		// 不调用 Flush()，避免阻塞
+		// CopyResource/CopySubresourceRegion 命令已经提交到命令队列，GPU 会异步执行
 		return true;
 	}
 
@@ -156,11 +177,17 @@ namespace LightroomCore {
 			return false;
 		}
 
-		// 初始化第一个Back Buffer（用于渲染）
-		if (!InitBufferResources(&info->BackBuffers[0], width, height)) {
-			// 如果失败，清理Front Buffer
-			info->FrontBuffer = BufferResources();
-			return false;
+		// 初始化两个Back Buffer（用于渲染，不需要D3D9 Surface）
+		// 注意：AcquireNextRenderBuffer会先切换缓冲区，所以需要初始化两个
+		for (int32_t i = 0; i < 2; ++i) {
+			if (!InitBufferResources(&info->BackBuffers[i], width, height, false)) {
+				// 如果失败，清理Front Buffer和已创建的Back Buffers
+				info->FrontBuffer = BufferResources();
+				for (int32_t j = 0; j < i; ++j) {
+					info->BackBuffers[j] = BufferResources();
+				}
+				return false;
+			}
 		}
 
 		info->Width = width;
@@ -203,9 +230,10 @@ namespace LightroomCore {
 		}
 
 		// 保存旧Front Buffer的内容（用于复制）
-		BufferResources* oldFront = &info->FrontBuffer;
-		bool hasContent = oldFront->D3D11SharedTexture != nullptr && 
-		                  oldFront->Width > 0 && oldFront->Height > 0;
+		// 重要：必须先移动到临时变量，因为InitBufferResources会覆盖原内容
+		BufferResources oldFront = std::move(info->FrontBuffer);
+		bool hasContent = oldFront.D3D11SharedTexture != nullptr && 
+		                  oldFront.Width > 0 && oldFront.Height > 0;
 
 		// 重新初始化Front Buffer（WPF使用的固定缓冲区）
 		// 注意：这里会改变WPF的Surface指针，但resize时这是必要的
@@ -213,9 +241,9 @@ namespace LightroomCore {
 			return false;
 		}
 
-		// 重新初始化所有Back Buffers
+		// 重新初始化所有Back Buffers（不需要D3D9 Surface）
 		for (int32_t i = 0; i < 2; ++i) {
-			if (!InitBufferResources(&info->BackBuffers[i], width, height)) {
+			if (!InitBufferResources(&info->BackBuffers[i], width, height, false)) {
 				// 如果失败，清理已创建的缓冲区
 				info->FrontBuffer = BufferResources();
 				for (int32_t j = 0; j < i; ++j) {
@@ -226,34 +254,12 @@ namespace LightroomCore {
 		}
 
 		// 如果旧缓冲区有内容，复制到新Front Buffer（避免resize时变黑）
+		// 注意：CopyBufferContent 是异步的，不需要等待完成
+		// 实际渲染会在resize后立即进行，所以这只是过渡内容
 		if (hasContent) {
-			CopyBufferContent(oldFront, &info->FrontBuffer);
-			
-			// 等待GPU完成复制，确保新Front Buffer有内容
-			auto* d3d11RHI = dynamic_cast<D3D11DynamicRHI*>(m_RHI.get());
-			if (d3d11RHI) {
-				ID3D11DeviceContext* context = d3d11RHI->GetDeviceContext();
-				if (context) {
-					// 创建查询确保复制完成
-					ComPtr<ID3D11Query> query;
-					D3D11_QUERY_DESC queryDesc = {};
-					queryDesc.Query = D3D11_QUERY_EVENT;
-					HRESULT hr = d3d11RHI->GetDevice()->CreateQuery(&queryDesc, query.GetAddressOf());
-					if (SUCCEEDED(hr) && query) {
-						context->End(query.Get());
-						context->Flush();
-						
-						// 等待GPU完成（非阻塞，但会等待）
-						BOOL queryData = FALSE;
-						while (context->GetData(query.Get(), &queryData, sizeof(BOOL), 0) == S_FALSE) {
-							std::this_thread::sleep_for(std::chrono::microseconds(100));
-						}
-					} else {
-						// 如果创建查询失败，至少确保命令已提交
-						context->Flush();
-					}
-				}
-			}
+			CopyBufferContent(&oldFront, &info->FrontBuffer);
+			// 不等待GPU完成，避免阻塞
+			// 后续的渲染会覆盖这个临时内容
 		}
 
 		info->Width = width;
@@ -282,8 +288,19 @@ namespace LightroomCore {
 	}
 
 	std::shared_ptr<RHITexture2D> RenderTargetManager::GetRHITexture(void* handle) {
-		// 返回当前Back Buffer的纹理（用于渲染）
-		return AcquireNextRenderBuffer(handle);
+		// 返回当前Back Buffer的纹理（不切换，用于读取等操作）
+		auto* info = GetRenderTargetInfo(handle);
+		if (!info) {
+			return nullptr;
+		}
+		
+		// 返回当前Back Buffer的纹理
+		BufferResources* backBuffer = &info->BackBuffers[info->CurrentBackBuffer];
+		if (!backBuffer->D3D11SharedTexture) {
+			return nullptr;
+		}
+		
+		return backBuffer->RHITexture;
 	}
 
 	HANDLE RenderTargetManager::GetD3D11SharedHandle(void* handle) {
@@ -300,13 +317,13 @@ namespace LightroomCore {
 		// 双缓冲轮换：切换到下一个Back Buffer
 		info->CurrentBackBuffer = (info->CurrentBackBuffer + 1) % 2;
 		
-		// 确保Back Buffer已初始化
+		// 确保Back Buffer已初始化（Back Buffer不需要D3D9 Surface）
 		BufferResources* backBuffer = &info->BackBuffers[info->CurrentBackBuffer];
 		if (!backBuffer->D3D11SharedTexture || 
 		    backBuffer->Width != info->Width ||
 		    backBuffer->Height != info->Height) {
-			// 需要初始化Back Buffer
-			if (!InitBufferResources(backBuffer, info->Width, info->Height)) {
+			// 需要初始化Back Buffer（不需要D3D9 Surface）
+			if (!InitBufferResources(backBuffer, info->Width, info->Height, false)) {
 				return nullptr;
 			}
 		}
@@ -332,31 +349,16 @@ namespace LightroomCore {
 		if (!context) return false;
 
 		// 将Back Buffer的内容复制到Front Buffer
+		// 注意：CopyResource 是异步的，不需要等待完成
+		// WPF 会在需要时读取 Front Buffer，GPU 会异步执行复制
 		context->CopyResource(
 			info->FrontBuffer.D3D11SharedTexture.Get(),
 			backBuffer->D3D11SharedTexture.Get()
 		);
 
-		// 创建GPU同步查询（Fence）确保复制完成
-		ComPtr<ID3D11Query> query;
-		D3D11_QUERY_DESC queryDesc = {};
-		queryDesc.Query = D3D11_QUERY_EVENT;
-		HRESULT hr = d3d11RHI->GetDevice()->CreateQuery(&queryDesc, query.GetAddressOf());
-		if (SUCCEEDED(hr) && query) {
-			// 在复制命令后插入查询
-			context->End(query.Get());
-			context->Flush();
-
-			// 等待GPU完成（非阻塞检查，避免卡住）
-			BOOL queryData = FALSE;
-			while (context->GetData(query.Get(), &queryData, sizeof(BOOL), 0) == S_FALSE) {
-				// GPU还在工作，等待一小段时间
-				std::this_thread::sleep_for(std::chrono::microseconds(100));
-			}
-		} else {
-			// 如果创建查询失败，至少确保命令已提交
-			context->Flush();
-		}
+		// 不调用 Flush()，避免阻塞
+		// CopyResource 命令已经提交到命令队列，GPU 会异步执行
+		// WPF 的 D3DImage 会在需要时自动等待 GPU 完成
 
 		return true;
 	}

@@ -27,6 +27,7 @@ EXPORTS
     GetCurrentVideoFrame
     GetCurrentVideoTimestamp
     IsVideoFormat
+    ExtractVideoThumbnail
 
 
 

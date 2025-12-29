@@ -203,31 +203,53 @@ namespace LightroomCore {
     }
 
     bool FFmpegSoftwareVideoLoader::DecodeFrame() {
+        // 检查必要的资源是否有效
+        if (!m_FormatContext || !m_CodecContext || !m_Frame || m_VideoStreamIndex < 0) {
+            return false;
+        }
+
         AVPacket* packet = av_packet_alloc();
         if (!packet) {
             return false;
         }
 
-        while (av_read_frame(m_FormatContext, packet) >= 0) {
+        int readRet = 0;
+        while ((readRet = av_read_frame(m_FormatContext, packet)) >= 0) {
             if (packet->stream_index == m_VideoStreamIndex) {
-                if (avcodec_send_packet(m_CodecContext, packet) < 0) {
+                // 检查 codec context 是否有效
+                if (!m_CodecContext || m_CodecContext->codec_id == AV_CODEC_ID_NONE) {
                     av_packet_unref(packet);
-                    continue;
+                    break;
+                }
+
+                int sendRet = avcodec_send_packet(m_CodecContext, packet);
+                av_packet_unref(packet);
+
+                if (sendRet < 0) {
+                    // 如果是 EAGAIN，需要继续读取更多数据
+                    if (sendRet == AVERROR(EAGAIN)) {
+                        continue;
+                    }
+                    // 其他错误，停止解码
+                    break;
                 }
 
                 int ret = avcodec_receive_frame(m_CodecContext, m_Frame);
-                av_packet_unref(packet);
-
                 if (ret == 0) {
                     av_packet_free(&packet);
                     return true;
                 }
                 else if (ret == AVERROR(EAGAIN)) {
+                    // 需要更多输入数据，继续读取
                     continue;
                 }
+                else if (ret == AVERROR_EOF) {
+                    // 解码器已刷新，没有更多帧
+                    break;
+                }
                 else {
-                    av_packet_free(&packet);
-                    return false;
+                    // 其他错误，停止解码
+                    break;
                 }
             }
             else {

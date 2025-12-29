@@ -88,14 +88,92 @@ namespace Lightroom.App.Controls
 
                 if (isVideoFile)
                 {
-                    // 对于视频文件，显示视频图标或占位符
-                    // 暂时使用一个简单的占位符，后续可以提取视频第一帧
-                    System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                    // 对于视频文件，提取第一帧作为封面图
+                    System.Threading.Tasks.Task.Run(() =>
                     {
-                        // 创建一个简单的视频图标占位符
-                        var placeholder = CreateVideoPlaceholder();
-                        Thumbnail = placeholder;
-                        IsLoading = false;
+                        try
+                        {
+                            // 提取视频第一帧（缩略图尺寸：200x200）
+                            uint width = 0, height = 0;
+                            int maxSize = 200 * 200 * 4; // 最大200x200，BGRA32格式
+                            IntPtr pixelDataPtr = System.Runtime.InteropServices.Marshal.AllocHGlobal(maxSize);
+                            
+                            try
+                            {
+                                bool success = NativeMethods.ExtractVideoThumbnail(ImagePath, out width, out height, pixelDataPtr, 200, 200);
+                                
+                                if (success && width > 0 && height > 0)
+                                {
+                                    // 从非托管内存复制数据
+                                    int dataSize = (int)(width * height * 4);
+                                    byte[] pixelData = new byte[dataSize];
+                                    System.Runtime.InteropServices.Marshal.Copy(pixelDataPtr, pixelData, 0, dataSize);
+                                    
+                                    // 创建BitmapImage
+                                    var bitmap = new BitmapImage();
+                                    bitmap.BeginInit();
+                                    
+                                    // 从像素数据创建BitmapSource
+                                    var stride = width * 4; // BGRA32，每像素4字节
+                                    var bitmapSource = System.Windows.Media.Imaging.BitmapSource.Create(
+                                        (int)width,
+                                        (int)height,
+                                        96, 96, // DPI
+                                        System.Windows.Media.PixelFormats.Bgra32,
+                                        null,
+                                        pixelData,
+                                        (int)stride
+                                    );
+                                    
+                                    // 将BitmapSource编码为PNG格式的MemoryStream
+                                    var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+                                    encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmapSource));
+                                    
+                                    using (var stream = new System.IO.MemoryStream())
+                                    {
+                                        encoder.Save(stream);
+                                        stream.Position = 0;
+                                        
+                                        bitmap.StreamSource = stream;
+                                        bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                                        bitmap.EndInit();
+                                        bitmap.Freeze();
+                                        
+                                        // 回到UI线程更新
+                                        System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                                        {
+                                            Thumbnail = bitmap;
+                                            IsLoading = false;
+                                        });
+                                    }
+                                }
+                                else
+                                {
+                                    // 如果提取失败，使用占位符
+                                    System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                                    {
+                                        var placeholder = CreateVideoPlaceholder();
+                                        Thumbnail = placeholder;
+                                        IsLoading = false;
+                                    });
+                                }
+                            }
+                            finally
+                            {
+                                // 释放非托管内存
+                                System.Runtime.InteropServices.Marshal.FreeHGlobal(pixelDataPtr);
+                            }
+                        }
+                        catch
+                        {
+                            // 如果出错，使用占位符
+                            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                            {
+                                var placeholder = CreateVideoPlaceholder();
+                                Thumbnail = placeholder;
+                                IsLoading = false;
+                            });
+                        }
                     });
                 }
                 else
